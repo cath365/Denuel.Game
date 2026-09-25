@@ -148,7 +148,7 @@ const FIGHTER_ROSTER: Array<{
   },
   {
     id: "classic-blaze",
-    name: "Classic Blaze",
+    name: "Blaze OG",
     skin: "blonde",
     visualStyle: "classic",
     subtitle: "Classic Rushdown",
@@ -162,7 +162,7 @@ const FIGHTER_ROSTER: Array<{
   },
   {
     id: "classic-nyx",
-    name: "Classic Nyx",
+    name: "Nyx OG",
     skin: "dark",
     visualStyle: "classic",
     subtitle: "Classic Power Guard",
@@ -2033,7 +2033,6 @@ export default function FuseRushGame() {
             <div className="fighter-select-grid">
               {FIGHTER_ROSTER.map((fighter) => {
                 const selected = fighterChoice === fighter.id;
-                const isPhaseOne = fighter.visualStyle === "phase1";
                 const atlasSource =
                   fighter.skin === "blonde" ? BLAZE_ATLAS : NYX_ATLAS;
 
@@ -2048,16 +2047,20 @@ export default function FuseRushGame() {
                     }}
                   >
                     <span className="select-card-art">
-                      {isPhaseOne ? (
-                        <span
-                          className="select-atlas-preview"
-                          style={{ backgroundImage: `url(${atlasSource})` }}
-                          aria-hidden="true"
-                        />
-                      ) : (
+                      <span
+                        className={`select-atlas-preview ${fighter.skin}`}
+                        style={{ backgroundImage: `url(${atlasSource})` }}
+                        aria-hidden="true"
+                      />
+
+                      {fighter.visualStyle === "classic" && (
                         <img
+                          className="classic-portrait"
                           src={`/sprites/${fighter.skin}-idle.webp`}
                           alt={fighter.name}
+                          onError={(event) => {
+                            event.currentTarget.style.display = "none";
+                          }}
                         />
                       )}
                     </span>
@@ -2070,24 +2073,28 @@ export default function FuseRushGame() {
                 );
               })}
 
-              {["Sahin", "Leon", "Vex", "Hana", "Kai", "Rei", "Lumi", "Bram"].map(
-                (name, index) => (
-                  <button
-                    key={name}
-                    className="select-fighter-card locked"
-                    disabled
-                    aria-label={`${name} coming soon`}
-                  >
-                    <span className="locked-silhouette">
-                      {index % 3 === 0 ? "◈" : index % 3 === 1 ? "✦" : "◆"}
-                    </span>
-                    <span className="select-card-footer">
-                      <b>{name}</b>
-                      <small>LOCKED</small>
-                    </span>
-                  </button>
-                )
-              )}
+              {[
+                ["Sahin", "◈"],
+                ["Leon", "✦"],
+                ["Vex", "◆"],
+                ["Hana", "✧"],
+              ].map(([name, icon]) => (
+                <button
+                  key={name}
+                  className="select-fighter-card locked"
+                  disabled
+                  aria-label={`${name} coming soon`}
+                >
+                  <span className="locked-silhouette">
+                    <span>{icon}</span>
+                    <i />
+                  </span>
+                  <span className="select-card-footer">
+                    <b>{name}</b>
+                    <small>LOCKED</small>
+                  </span>
+                </button>
+              ))}
             </div>
 
             <div
@@ -2095,22 +2102,26 @@ export default function FuseRushGame() {
               style={{ "--fighter-accent": selectedRosterFighter.accent } as React.CSSProperties}
             >
               <div className="fighter-detail-art">
-                {selectedRosterFighter.visualStyle === "phase1" ? (
-                  <span
-                    className="detail-atlas-preview"
-                    style={{
-                      backgroundImage: `url(${
-                        selectedRosterFighter.skin === "blonde"
-                          ? BLAZE_ATLAS
-                          : NYX_ATLAS
-                      })`,
-                    }}
-                    aria-hidden="true"
-                  />
-                ) : (
+                <span
+                  className={`detail-atlas-preview ${selectedRosterFighter.skin}`}
+                  style={{
+                    backgroundImage: `url(${
+                      selectedRosterFighter.skin === "blonde"
+                        ? BLAZE_ATLAS
+                        : NYX_ATLAS
+                    })`,
+                  }}
+                  aria-hidden="true"
+                />
+
+                {selectedRosterFighter.visualStyle === "classic" && (
                   <img
+                    className="classic-detail-portrait"
                     src={`/sprites/${selectedRosterFighter.skin}-idle.webp`}
                     alt={selectedRosterFighter.name}
+                    onError={(event) => {
+                      event.currentTarget.style.display = "none";
+                    }}
                   />
                 )}
               </div>
@@ -2124,12 +2135,16 @@ export default function FuseRushGame() {
                 <p>{selectedRosterFighter.description}</p>
 
                 {[
-                  ["ATTACK", selectedRosterFighter.attack],
-                  ["DEFENSE", selectedRosterFighter.defense],
-                  ["SPEED", selectedRosterFighter.speedStat],
-                  ["TECHNIQUE", selectedRosterFighter.technique],
-                ].map(([label, value]) => (
-                  <div className="fighter-stat-row" key={String(label)}>
+                  ["ATTACK", selectedRosterFighter.attack, "#ff6b67"],
+                  ["DEFENSE", selectedRosterFighter.defense, "#ffbd55"],
+                  ["SPEED", selectedRosterFighter.speedStat, "#5bd8ff"],
+                  ["TECHNIQUE", selectedRosterFighter.technique, "#ca6bff"],
+                ].map(([label, value, color]) => (
+                  <div
+                    className="fighter-stat-row"
+                    key={String(label)}
+                    style={{ "--stat-color": color } as React.CSSProperties}
+                  >
                     <span>{label}</span>
                     <div className="fighter-stat-track">
                       {Array.from({ length: 6 }).map((_, i) => (
@@ -2160,7 +2175,7 @@ export default function FuseRushGame() {
             </button>
 
             <div className="help fighter-select-help">
-              The selected fighter keeps the same appearance, stats, style and special move in the match.
+              Your selection keeps the same fighter appearance and fighting style in the match.
             </div>
           </div>
         </section>
