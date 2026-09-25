@@ -65,6 +65,12 @@ type Hud = {
   time: number;
   energy: number;
   combo: number;
+  round: number;
+  playerRounds: number;
+  enemyRounds: number;
+  roundBanner: string;
+  timeLeft: number;
+  specialName: string;
 };
 
 type Result = {
@@ -74,6 +80,8 @@ type Result = {
   coins: number;
   xp: number;
   time: number;
+  playerRounds: number;
+  enemyRounds: number;
 };
 
 const BOT_NAMES = ["Nova", "Rex"];
@@ -83,6 +91,31 @@ const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(ma
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
 const attackProgressSafe = (t: number, fighter: Fighter, duration: number) =>
   clamp((t - fighter.attackStartedAt) / duration, 0, 1);
+
+const fighterTuning = (skin: Skin) =>
+  skin === "blonde"
+    ? {
+        name: "Blaze",
+        style: "Rushdown",
+        speed: 1.12,
+        punchDamage: 1.15,
+        kickDamage: 0.96,
+        punchCooldown: 0.82,
+        kickCooldown: 1,
+        guardFactor: 0.32,
+        specialName: "BLAZE RUSH",
+      }
+    : {
+        name: "Nyx",
+        style: "Power Guard",
+        speed: 0.98,
+        punchDamage: 0.96,
+        kickDamage: 1.2,
+        punchCooldown: 1,
+        kickCooldown: 0.82,
+        guardFactor: 0.2,
+        specialName: "NYX BREAKER",
+      };
 
 function burst(g: any, x: number, y: number, color: string, count = 12, speed = 190) {
   for (let i = 0; i < count; i++) {
@@ -135,6 +168,12 @@ export default function FuseRushGame() {
     time: 0,
     energy: 0,
     combo: 0,
+    round: 1,
+    playerRounds: 0,
+    enemyRounds: 0,
+    roundBanner: "ROUND 1",
+    timeLeft: 60,
+    specialName: fighterTuning("blonde").specialName,
   });
   const [result, setResult] = useState<Result>({
     won: false,
@@ -143,6 +182,8 @@ export default function FuseRushGame() {
     coins: 0,
     xp: 0,
     time: 0,
+    playerRounds: 0,
+    enemyRounds: 0,
   });
 
   useEffect(() => {
@@ -312,6 +353,17 @@ export default function FuseRushGame() {
       lastHudAt: 0,
       comboSequence: [] as string[],
       comboWindowUntil: 0,
+      round: 1,
+      playerRounds: 0,
+      enemyRounds: 0,
+      roundDuration: 60000,
+      roundStartedAt: now,
+      roundActive: true,
+      roundBanner: "ROUND 1",
+      roundBannerUntil: now + 1300,
+      nextRoundAt: 0,
+      matchFinishAt: 0,
+      matchWinner: false,
     };
 
     setHud({
@@ -326,6 +378,12 @@ export default function FuseRushGame() {
       time: 0,
       energy: 0,
       combo: 0,
+      round: 1,
+      playerRounds: 0,
+      enemyRounds: 0,
+      roundBanner: "ROUND 1",
+      timeLeft: 60,
+      specialName: fighterTuning(skin).specialName,
     });
 
     setPunchReady(true);
@@ -354,6 +412,9 @@ export default function FuseRushGame() {
       const range = type === "punch" ? 78 : 112;
       if (forward < 4 || absDx > range) return false;
 
+      const attackerTune = fighterTuning(attacker.skin);
+      const targetTune = fighterTuning(target.skin);
+
       let damage =
         type === "punch"
           ? attacker.human
@@ -363,11 +424,22 @@ export default function FuseRushGame() {
             ? Math.floor(rand(18, 25))
             : Math.floor(rand(14, 21));
 
-      let knockback = type === "punch" ? 240 : 410;
+      damage = Math.max(
+        1,
+        Math.floor(
+          damage * (type === "punch" ? attackerTune.punchDamage : attackerTune.kickDamage)
+        )
+      );
+
+      let knockback =
+        type === "punch"
+          ? 240 * (attacker.skin === "blonde" ? 1.08 : 1)
+          : 410 * (attacker.skin === "dark" ? 1.12 : 1);
+
       const isBlocking = target.blocking || now < target.blockUntil;
 
       if (isBlocking) {
-        damage = Math.max(2, Math.floor(damage * 0.28));
+        damage = Math.max(2, Math.floor(damage * targetTune.guardFactor));
         knockback *= 0.32;
         target.energy = clamp(target.energy + 7, 0, 100);
         g.floaters.push({
@@ -481,12 +553,16 @@ export default function FuseRushGame() {
 
       if (type === "punch") {
         if (now < fighter.punchCooldownUntil) return false;
-        fighter.punchCooldownUntil = now + (fighter.human ? 380 : rand(460, 680));
-        fighter.attackUntil = now + 250;
+        const tune = fighterTuning(fighter.skin);
+        fighter.punchCooldownUntil =
+          now + (fighter.human ? 380 * tune.punchCooldown : rand(460, 680) * tune.punchCooldown);
+        fighter.attackUntil = now + (fighter.skin === "blonde" ? 225 : 260);
       } else {
         if (now < fighter.kickCooldownUntil) return false;
-        fighter.kickCooldownUntil = now + (fighter.human ? 780 : rand(850, 1180));
-        fighter.attackUntil = now + 390;
+        const tune = fighterTuning(fighter.skin);
+        fighter.kickCooldownUntil =
+          now + (fighter.human ? 780 * tune.kickCooldown : rand(850, 1180) * tune.kickCooldown);
+        fighter.attackUntil = now + (fighter.skin === "dark" ? 350 : 405);
       }
 
       fighter.attackType = type;
@@ -521,31 +597,37 @@ export default function FuseRushGame() {
 
   const punch = useCallback(() => {
     const g = gameRef.current;
-    if (!g || runState !== "playing") return;
+    if (!g || runState !== "playing" || !g.roundActive) return;
     const player: Fighter = g.fighters[0];
     const now = performance.now();
 
     if (!performAttack(player, "punch", now)) return;
 
     setPunchReady(false);
-    setTimeout(() => setPunchReady(true), 380);
+    setTimeout(
+      () => setPunchReady(true),
+      Math.max(120, player.punchCooldownUntil - now)
+    );
   }, [performAttack, runState]);
 
   const kick = useCallback(() => {
     const g = gameRef.current;
-    if (!g || runState !== "playing") return;
+    if (!g || runState !== "playing" || !g.roundActive) return;
     const player: Fighter = g.fighters[0];
     const now = performance.now();
 
     if (!performAttack(player, "kick", now)) return;
 
     setKickReady(false);
-    setTimeout(() => setKickReady(true), 780);
+    setTimeout(
+      () => setKickReady(true),
+      Math.max(220, player.kickCooldownUntil - now)
+    );
   }, [performAttack, runState]);
 
   const setBlockState = useCallback((active: boolean) => {
     const g = gameRef.current;
-    if (!g || runState !== "playing") return;
+    if (!g || runState !== "playing" || !g.roundActive) return;
     const player: Fighter = g.fighters[0];
     const now = performance.now();
 
@@ -569,17 +651,18 @@ export default function FuseRushGame() {
 
   const special = useCallback(() => {
     const g = gameRef.current;
-    if (!g || runState !== "playing") return;
+    if (!g || runState !== "playing" || !g.roundActive) return;
     const player: Fighter = g.fighters[0];
     const now = performance.now();
 
     if (!player.alive || player.energy < 100 || now < player.stunUntil) return;
 
+    const tune = fighterTuning(player.skin);
     player.energy = 0;
     player.blocking = false;
-    player.attackType = "kick";
     player.attackStartedAt = now;
-    player.attackUntil = now + 650;
+    player.attackUntil = now + (player.skin === "blonde" ? 760 : 690);
+    player.attackType = player.skin === "blonde" ? "punch" : "kick";
     setBlocking(false);
     setSpecialReady(false);
 
@@ -588,45 +671,106 @@ export default function FuseRushGame() {
       .sort((a, b) => Math.abs(a.x - player.x) - Math.abs(b.x - player.x));
 
     const target = targets[0];
-    if (target) {
-      player.facing = target.x >= player.x ? 1 : -1;
-      player.vx += player.facing * 380;
-      setTimeout(() => {
-        const live = gameRef.current;
-        if (!live || runState !== "playing" || !target.alive) return;
-        if (Math.abs(target.x - player.x) < 150) {
-          const damage = 38;
+    if (!target) return;
+
+    player.facing = target.x >= player.x ? 1 : -1;
+
+    g.floaters.push({
+      x: player.x,
+      y: g.groundY - 150,
+      text: tune.specialName,
+      life: 1.2,
+      color: player.skin === "blonde" ? "#ffe66d" : "#9ffcff",
+      size: 20,
+    });
+
+    if (player.skin === "blonde") {
+      player.vx += player.facing * 520;
+
+      [150, 300, 455].forEach((delay, index) => {
+        setTimeout(() => {
+          const live = gameRef.current;
+          if (!live || runState !== "playing" || !live.roundActive || !target.alive) return;
+          if (Math.abs(target.x - player.x) > 165) return;
+
+          const damage = index === 2 ? 18 : 13;
           target.hp = Math.max(0, target.hp - damage);
-          target.vx += player.facing * 650;
-          target.stunUntil = performance.now() + 420;
-          target.invulnUntil = performance.now() + 320;
-          live.score += 900;
-          burst(live, target.x, live.groundY - 65, "#9ffcff", 30, 340);
+          target.stunUntil = performance.now() + 170;
+          target.invulnUntil = performance.now() + 125;
+          target.vx += player.facing * (index === 2 ? 520 : 180);
+          live.score += 260 + index * 80;
+          burst(
+            live,
+            target.x,
+            live.groundY - 68,
+            index === 2 ? "#fff06b" : "#ffb85c",
+            index === 2 ? 22 : 12,
+            index === 2 ? 300 : 190
+          );
           live.floaters.push({
             x: target.x,
-            y: live.groundY - 145,
-            text: "SPECIAL! -38",
-            life: 1.25,
-            color: "#9ffcff",
-            size: 21,
+            y: live.groundY - 118 - index * 10,
+            text: index === 2 ? "FINISH!" : `RUSH ${index + 1}`,
+            life: 0.8,
+            color: "#ffe66d",
+            size: index === 2 ? 18 : 13,
           });
-          live.shake = 15;
-          if (target.hp <= 0) {
+          live.shake = Math.max(live.shake, index === 2 ? 12 : 6);
+
+          if (target.hp <= 0 && target.alive) {
             target.alive = false;
             target.koUntil = performance.now() + 900;
             live.kos += 1;
             live.score += 750;
           }
-          beep(75, 0.18, 0.085, "sawtooth");
-          vibrate([35, 25, 55]);
+        }, delay);
+      });
+
+      beep(125, 0.16, 0.075, "sawtooth");
+      vibrate([20, 20, 20, 20, 45]);
+    } else {
+      player.vx += player.facing * 330;
+
+      setTimeout(() => {
+        const live = gameRef.current;
+        if (!live || runState !== "playing" || !live.roundActive || !target.alive) return;
+        if (Math.abs(target.x - player.x) > 175) return;
+
+        const damage = 48;
+        target.blocking = false;
+        target.blockUntil = 0;
+        target.hp = Math.max(0, target.hp - damage);
+        target.vx += player.facing * 760;
+        target.stunUntil = performance.now() + 480;
+        target.invulnUntil = performance.now() + 350;
+        live.score += 1050;
+        burst(live, target.x, live.groundY - 62, "#9ffcff", 34, 360);
+        live.floaters.push({
+          x: target.x,
+          y: live.groundY - 145,
+          text: "GUARD BREAK! -48",
+          life: 1.25,
+          color: "#9ffcff",
+          size: 20,
+        });
+        live.shake = 16;
+
+        if (target.hp <= 0 && target.alive) {
+          target.alive = false;
+          target.koUntil = performance.now() + 950;
+          live.kos += 1;
+          live.score += 750;
         }
-      }, 250);
+      }, 285);
+
+      beep(72, 0.2, 0.09, "sawtooth");
+      vibrate([40, 25, 65]);
     }
   }, [beep, runState]);
 
   const dash = useCallback(() => {
     const g = gameRef.current;
-    if (!g || runState !== "playing") return;
+    if (!g || runState !== "playing" || !g.roundActive) return;
     const player: Fighter = g.fighters[0];
     const now = performance.now();
 
@@ -801,7 +945,8 @@ export default function FuseRushGame() {
       bot.facing = dir;
 
       if (distance > 92) {
-        bot.vx += dir * (distance > 200 ? 700 : 520) * dt;
+        const tune = fighterTuning(bot.skin);
+        bot.vx += dir * (distance > 200 ? 700 : 520) * tune.speed * dt;
       } else if (distance < 48) {
         bot.vx -= dir * 180 * dt;
       }
@@ -891,7 +1036,8 @@ export default function FuseRushGame() {
           if (Math.abs(dir) > 0.08) {
             const sign: 1 | -1 = dir >= 0 ? 1 : -1;
             player.facing = sign;
-            player.vx += sign * 880 * dt;
+            const tune = fighterTuning(player.skin);
+            player.vx += sign * 880 * tune.speed * dt;
           }
         }
 
@@ -905,7 +1051,9 @@ export default function FuseRushGame() {
           const drag = Math.pow(0.0012, dt);
           fighter.vx *= drag;
 
-          const maxSpeed = t < fighter.dashUntil ? 610 : fighter.human ? 310 : 290;
+          const tune = fighterTuning(fighter.skin);
+          const baseSpeed = fighter.human ? 310 : 290;
+          const maxSpeed = t < fighter.dashUntil ? 610 * tune.speed : baseSpeed * tune.speed;
           fighter.vx = clamp(fighter.vx, -maxSpeed, maxSpeed);
           fighter.x += fighter.vx * dt;
 
@@ -1370,7 +1518,7 @@ export default function FuseRushGame() {
               >
                 <img src="/sprites/blonde-idle.webp" alt="Blaze" />
                 <b>Blaze</b>
-                <small>Fast • aggressive</small>
+                <small>Rushdown • fast punches • Blaze Rush</small>
               </button>
 
               <button
@@ -1379,7 +1527,7 @@ export default function FuseRushGame() {
               >
                 <img src="/sprites/dark-idle.webp" alt="Nyx" />
                 <b>Nyx</b>
-                <small>Quick • tactical</small>
+                <small>Power Guard • heavy kicks • Nyx Breaker</small>
               </button>
             </div>
 
