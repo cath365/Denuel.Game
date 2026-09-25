@@ -5,6 +5,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 type Skin = "blonde" | "dark";
 type RunState = "menu" | "playing" | "result";
 type AttackType = "punch" | "kick" | null;
+type WeaponType = "bat" | "hammer" | "blade" | null;
+type WeaponPickup = {
+  id: number;
+  type: Exclude<WeaponType, null>;
+  x: number;
+  active: boolean;
+  respawnAt: number;
+};
 
 type Fighter = {
   id: number;
@@ -35,6 +43,8 @@ type Fighter = {
   comboCount: number;
   comboUntil: number;
   koUntil: number;
+  weapon: WeaponType;
+  weaponDurability: number;
 };
 
 type Particle = {
@@ -71,6 +81,8 @@ type Hud = {
   roundBanner: string;
   timeLeft: number;
   specialName: string;
+  weapon: string;
+  weaponDurability: number;
 };
 
 type Result = {
@@ -116,6 +128,104 @@ const fighterTuning = (skin: Skin) =>
         guardFactor: 0.2,
         specialName: "NYX BREAKER",
       };
+
+const weaponTuning = (type: Exclude<WeaponType, null>) => {
+  if (type === "bat") {
+    return {
+      name: "BAT",
+      damageBonus: 7,
+      rangeBonus: 28,
+      knockbackBonus: 135,
+      cooldownMul: 1,
+      durability: 5,
+      color: "#9c673b",
+    };
+  }
+
+  if (type === "hammer") {
+    return {
+      name: "HAMMER",
+      damageBonus: 13,
+      rangeBonus: 20,
+      knockbackBonus: 250,
+      cooldownMul: 1.22,
+      durability: 4,
+      color: "#9aa8b9",
+    };
+  }
+
+  return {
+    name: "ENERGY BLADE",
+    damageBonus: 10,
+    rangeBonus: 42,
+    knockbackBonus: 165,
+    cooldownMul: 0.9,
+    durability: 6,
+    color: "#74f6ff",
+  };
+};
+
+function drawWeaponShape(
+  ctx: CanvasRenderingContext2D,
+  type: Exclude<WeaponType, null>,
+  scale = 1,
+  swing = 0
+) {
+  ctx.save();
+  ctx.scale(scale, scale);
+
+  if (type === "bat") {
+    ctx.rotate(-0.38 + swing * 0.7);
+    ctx.strokeStyle = "#6f4529";
+    ctx.lineWidth = 7;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(-4, 9);
+    ctx.lineTo(26, -14);
+    ctx.stroke();
+    ctx.strokeStyle = "#bd8650";
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.moveTo(18, -8);
+    ctx.lineTo(35, -22);
+    ctx.stroke();
+  } else if (type === "hammer") {
+    ctx.rotate(-0.55 + swing * 0.8);
+    ctx.strokeStyle = "#6d4b30";
+    ctx.lineWidth = 6;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(0, 12);
+    ctx.lineTo(24, -15);
+    ctx.stroke();
+    ctx.fillStyle = "#aab5c4";
+    ctx.fillRect(17, -26, 24, 14);
+    ctx.strokeStyle = "#4b5666";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(17, -26, 24, 14);
+  } else {
+    ctx.rotate(-0.3 + swing * 0.75);
+    ctx.strokeStyle = "#243347";
+    ctx.lineWidth = 7;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(-3, 10);
+    ctx.lineTo(10, -1);
+    ctx.stroke();
+
+    ctx.shadowBlur = 14;
+    ctx.shadowColor = "#74f6ff";
+    ctx.strokeStyle = "#9cffff";
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(10, -1);
+    ctx.lineTo(42, -30);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  ctx.restore();
+}
 
 function burst(g: any, x: number, y: number, color: string, count = 12, speed = 190) {
   for (let i = 0; i < count; i++) {
@@ -174,6 +284,8 @@ export default function FuseRushGame() {
     roundBanner: "ROUND 1",
     timeLeft: 60,
     specialName: fighterTuning("blonde").specialName,
+    weapon: "PUNCH",
+    weaponDurability: 0,
   });
   const [result, setResult] = useState<Result>({
     won: false,
@@ -271,6 +383,8 @@ export default function FuseRushGame() {
         comboCount: 0,
         comboUntil: 0,
         koUntil: 0,
+        weapon: null,
+        weaponDurability: 0,
       },
       {
         id: 1,
@@ -301,6 +415,8 @@ export default function FuseRushGame() {
         comboCount: 0,
         comboUntil: 0,
         koUntil: 0,
+        weapon: null,
+        weaponDurability: 0,
       },
       {
         id: 2,
@@ -331,6 +447,8 @@ export default function FuseRushGame() {
         comboCount: 0,
         comboUntil: 0,
         koUntil: 0,
+        weapon: null,
+        weaponDurability: 0,
       },
     ];
 
@@ -353,6 +471,12 @@ export default function FuseRushGame() {
       lastHudAt: 0,
       comboSequence: [] as string[],
       comboWindowUntil: 0,
+      weapons: [
+        { id: 1, type: "bat", x: width * 0.36, active: true, respawnAt: 0 },
+        { id: 2, type: "hammer", x: width * 0.52, active: true, respawnAt: 0 },
+        { id: 3, type: "blade", x: width * 0.69, active: true, respawnAt: 0 },
+      ] as WeaponPickup[],
+      weaponId: 4,
       round: 1,
       playerRounds: 0,
       enemyRounds: 0,
@@ -384,6 +508,8 @@ export default function FuseRushGame() {
       roundBanner: "ROUND 1",
       timeLeft: 60,
       specialName: fighterTuning(skin).specialName,
+      weapon: "PUNCH",
+      weaponDurability: 0,
     });
 
     setPunchReady(true);
@@ -929,6 +1055,8 @@ export default function FuseRushGame() {
         fighter.comboCount = 0;
         fighter.comboUntil = 0;
         fighter.koUntil = 0;
+        fighter.weapon = null;
+        fighter.weaponDurability = 0;
         fighter.targetId = fighter.human ? 1 : 0;
         fighter.thinkAt = 0;
       });
@@ -938,6 +1066,11 @@ export default function FuseRushGame() {
       g.nextRoundAt = 0;
       g.comboSequence = [];
       g.comboWindowUntil = 0;
+      g.weapons = [
+        { id: 1, type: "bat", x: g.width * 0.36, active: true, respawnAt: 0 },
+        { id: 2, type: "hammer", x: g.width * 0.52, active: true, respawnAt: 0 },
+        { id: 3, type: "blade", x: g.width * 0.69, active: true, respawnAt: 0 },
+      ] as WeaponPickup[];
       g.roundBanner = g.round >= 3 ? "FINAL ROUND" : `ROUND ${g.round}`;
       g.roundBannerUntil = now + 1250;
       g.particles = [];
