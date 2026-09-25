@@ -11,7 +11,7 @@ type Vec = { x: number; y: number };
 type Player = {
   id: number; x: number; y: number; vx: number; vy: number; r: number; alive: boolean; human: boolean;
   name: string; skin: Skin; color: string; bot: BotStyle; shield: boolean; speedUntil: number; dashUntil: number;
-  dashCooldownUntil: number; pushCooldownUntil: number; stunnedUntil: number; faceX: number; faceY: number;
+  dashCooldownUntil: number; pushCooldownUntil: number; attackUntil: number; stunnedUntil: number; faceX: number; faceY: number;
   lastHitBy: number | null; lastHitAt: number; thinkAt: number; targetId: number | null;
 };
 type Pickup = { id: number; x: number; y: number; type: PowerType; born: number };
@@ -95,7 +95,7 @@ export default function FuseRushGame() {
       id: i, x: 0, y: 0, vx: 0, vy: 0, r: i === 0 ? 20 : 18, alive: true, human: i === 0,
       name: i === 0 ? "YOU" : BOT_NAMES[i - 1], skin: i === 0 ? skin : (i % 2 ? "dark" : "blonde"), color: COLORS[i],
       bot: i === 0 ? "hunter" : BOT_STYLES[(i - 1) % BOT_STYLES.length], shield: false, speedUntil: 0, dashUntil: 0,
-      dashCooldownUntil: 0, pushCooldownUntil: 0, stunnedUntil: 0, faceX: 1, faceY: 0, lastHitBy: null, lastHitAt: 0,
+      dashCooldownUntil: 0, pushCooldownUntil: 0, attackUntil: 0, stunnedUntil: 0, faceX: 1, faceY: 0, lastHitBy: null, lastHitAt: 0,
       thinkAt: 0, targetId: null,
     }));
     players.forEach((p, i) => { const a = i / players.length * TAU + rand(-0.15, 0.15), r = baseRadius * rand(0.25, 0.7); p.x = center.x + Math.cos(a) * r; p.y = center.y + Math.sin(a) * r; });
@@ -133,7 +133,7 @@ export default function FuseRushGame() {
   const push = useCallback(() => {
     const g = gameRef.current; if (!g || runState !== "playing") return;
     const p: Player = g.players[0], now = performance.now(); if (!p.alive || now < p.pushCooldownUntil || now < p.stunnedUntil) return;
-    p.pushCooldownUntil = now + 900; setPushReady(false); setTimeout(() => setPushReady(true), 900); let hits = 0;
+    p.pushCooldownUntil = now + 900; p.attackUntil = now + 260; setPushReady(false); setTimeout(() => setPushReady(true), 900); let hits = 0;
     for (const t of g.players as Player[]) {
       if (!t.alive || t.id === p.id) continue; const dx = t.x - p.x, dy = t.y - p.y, d = Math.hypot(dx, dy) || 1; if (d > 94) continue;
       const n = { x: dx / d, y: dy / d }, facing = n.x * p.faceX + n.y * p.faceY; if (facing < -0.2) continue;
@@ -228,7 +228,7 @@ export default function FuseRushGame() {
           else { const target = (g.players as Player[]).find(q => q.id === p.targetId && q.alive) || human; dx = target.x - p.x; dy = target.y - p.y; }
           if (Math.hypot(dx, dy) < 1) { dx = Math.cos(p.id + t * 0.002); dy = Math.sin(p.id * 1.7 + t * 0.002); }
           const n = norm(dx, dy); p.faceX = n.x; p.faceY = n.y; const aggro = g.final3 ? 1.18 : 1; const accel = (p.bot === "bully" ? 800 : p.bot === "trickster" ? 760 : 710) * aggro * (t < p.speedUntil ? 1.28 : 1); p.vx += n.x * accel * dt; p.vy += n.y * accel * dt;
-          if ((p.bot === "bully" || p.bot === "hunter") && t > p.pushCooldownUntil) { const close = (g.players as Player[]).some(q => q.alive && q.id !== p.id && distance(p, q) < 84); if (close) { p.pushCooldownUntil = t + rand(1100, 1800); for (const q of g.players as Player[]) if (q.alive && q.id !== p.id && distance(p, q) < 86) { const k = norm(q.x - p.x, q.y - p.y); q.vx += k.x * 430; q.vy += k.y * 430; q.stunnedUntil = t + 120; q.lastHitBy = p.id; q.lastHitAt = t; } } }
+          if ((p.bot === "bully" || p.bot === "hunter") && t > p.pushCooldownUntil) { const close = (g.players as Player[]).some(q => q.alive && q.id !== p.id && distance(p, q) < 84); if (close) { p.pushCooldownUntil = t + rand(1100, 1800); p.attackUntil = t + 260; for (const q of g.players as Player[]) if (q.alive && q.id !== p.id && distance(p, q) < 86) { const k = norm(q.x - p.x, q.y - p.y); q.vx += k.x * 430; q.vy += k.y * 430; q.stunnedUntil = t + 120; q.lastHitBy = p.id; q.lastHitAt = t; } } }
         }
 
         if (g.eventType === "gravity") for (const p of g.players as Player[]) if (p.alive) { const n = norm(g.center.x - p.x, g.center.y - p.y); p.vx += n.x * 420 * dt; p.vy += n.y * 420 * dt; }
@@ -281,9 +281,105 @@ export default function FuseRushGame() {
         for (const p of g.players as Player[]) {
           if (!p.alive) continue; const carrier = p.id === g.carrierId; if (carrier) { const pulse = 27 + Math.sin(t * 0.015) * 4; ctx.strokeStyle = fuseLeftMs < 1800 ? "#ff315f" : "#ff7d9b"; ctx.lineWidth = 4; ctx.globalAlpha = 0.8; ctx.beginPath(); ctx.arc(p.x, p.y, pulse, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1; ctx.fillStyle = "#ff2e55"; ctx.font = "900 15px system-ui"; ctx.textAlign = "center"; ctx.fillText("💣", p.x, p.y - 43); }
           if (p.shield) { ctx.strokeStyle = "#53dfb0"; ctx.lineWidth = 3; ctx.globalAlpha = 0.72; ctx.beginPath(); ctx.arc(p.x, p.y, 28, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1; }
-          const img = imagesRef.current[p.skin]; const size = p.human ? 78 : 70, moving = Math.hypot(p.vx, p.vy) > 45, bob = moving ? Math.sin(t * 0.018 + p.id) * 3 : Math.sin(t * 0.006 + p.id) * 1.5; const stretch = t < p.dashUntil ? 1.18 : 1;
-          ctx.save(); ctx.translate(p.x, p.y + 4 + bob); if (p.faceX < -0.08) ctx.scale(-1, 1); ctx.scale(stretch, 1 / Math.sqrt(stretch)); if (p.human) { ctx.shadowBlur = 18; ctx.shadowColor = "rgba(140,124,255,.9)"; } if (img?.complete && img.naturalWidth > 0) ctx.drawImage(img, -size / 2, -size / 2, size, size); else { ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(0, 0, p.r, 0, TAU); ctx.fill(); } ctx.restore();
-          ctx.fillStyle = p.human ? "#fff" : "rgba(255,255,255,.82)"; ctx.font = p.human ? "900 11px system-ui" : "800 10px system-ui"; ctx.textAlign = "center"; ctx.fillText(p.name, p.x, p.y + 42);
+          const primary = imagesRef.current[p.skin];
+          const fallback = imagesRef.current.blonde;
+          const primaryReady = !!(primary?.complete && primary.naturalWidth > 0);
+          const img = primaryReady ? primary : fallback;
+          const speed = Math.hypot(p.vx, p.vy);
+          const moving = speed > 42;
+          const dashing = t < p.dashUntil;
+          const attacking = t < p.attackUntil;
+          const hurt = t < p.stunnedUntil;
+          const phase = t * (moving ? 0.022 : 0.007) + p.id * 0.9;
+          const bob = hurt ? Math.sin(phase * 2.3) * 2 : moving ? Math.sin(phase) * 4.2 : Math.sin(phase) * 1.4;
+          const runKick = moving ? Math.sin(phase) * 0.055 : 0;
+          const tilt = hurt ? Math.sin(phase * 2) * 0.28 : attacking ? -0.16 : runKick;
+          const stretchX = dashing ? 1.32 : attacking ? 1.1 : moving ? 1.04 + Math.abs(Math.sin(phase)) * 0.05 : 1;
+          const stretchY = dashing ? 0.82 : attacking ? 0.93 : moving ? 0.97 : 1;
+          const lunge = attacking ? 12 : dashing ? 8 : 0;
+          const size = p.human ? 82 : 74;
+          const fx = p.faceX < -0.08 ? -1 : 1;
+
+          if (moving && !hurt) {
+            ctx.save();
+            ctx.globalAlpha = dashing ? 0.28 : 0.11;
+            ctx.strokeStyle = p.human ? "#a89cff" : p.color;
+            ctx.lineWidth = dashing ? 8 : 4;
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.moveTo(p.x - p.faceX * (dashing ? 58 : 34), p.y - p.faceY * (dashing ? 58 : 34) + 9);
+            ctx.lineTo(p.x - p.faceX * 12, p.y - p.faceY * 12 + 9);
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          if (dashing && img?.complete && img.naturalWidth > 0) {
+            for (let ghost = 3; ghost >= 1; ghost--) {
+              ctx.save();
+              ctx.globalAlpha = 0.08 * ghost;
+              ctx.translate(p.x - p.faceX * ghost * 14, p.y - p.faceY * ghost * 14 + bob);
+              if (fx < 0) ctx.scale(-1, 1);
+              if (!primaryReady && p.skin === "dark") ctx.filter = "grayscale(.75) brightness(.62) saturate(1.3) hue-rotate(150deg)";
+              ctx.drawImage(img, -size / 2, -size / 2, size, size);
+              ctx.restore();
+            }
+          }
+
+          if (attacking) {
+            ctx.save();
+            ctx.strokeStyle = "rgba(255,225,125,.86)";
+            ctx.lineWidth = 6;
+            ctx.shadowBlur = 16;
+            ctx.shadowColor = "#ffd166";
+            const a = Math.atan2(p.faceY, p.faceX);
+            ctx.beginPath();
+            ctx.arc(p.x + p.faceX * 24, p.y + p.faceY * 24, 34, a - 0.85, a + 0.85);
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          if (hurt) {
+            ctx.save();
+            ctx.globalAlpha = 0.22 + Math.abs(Math.sin(phase * 3)) * 0.18;
+            ctx.fillStyle = "#ff4f6f";
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 31, 0, TAU);
+            ctx.fill();
+            ctx.restore();
+          }
+
+          ctx.save();
+          ctx.translate(p.x + p.faceX * lunge, p.y + 4 + bob + p.faceY * lunge);
+          ctx.rotate(tilt * fx);
+          if (fx < 0) ctx.scale(-1, 1);
+          ctx.scale(stretchX, stretchY);
+          if (p.human) { ctx.shadowBlur = 18; ctx.shadowColor = "rgba(140,124,255,.9)"; }
+          if (!primaryReady && p.skin === "dark") ctx.filter = "grayscale(.78) brightness(.58) saturate(1.5) hue-rotate(155deg)";
+          if (img?.complete && img.naturalWidth > 0) {
+            ctx.drawImage(img, -size / 2, -size / 2, size, size);
+          } else {
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(0, 0, p.r, 0, TAU);
+            ctx.fill();
+          }
+          ctx.restore();
+
+          if (moving && !dashing) {
+            ctx.save();
+            ctx.globalAlpha = 0.18;
+            ctx.fillStyle = "#ffffff";
+            const dust = 4 + Math.abs(Math.sin(phase)) * 5;
+            ctx.beginPath();
+            ctx.ellipse(p.x - p.faceX * 18, p.y + 30, dust * 1.8, dust * 0.65, 0, 0, TAU);
+            ctx.fill();
+            ctx.restore();
+          }
+
+          ctx.fillStyle = p.human ? "#fff" : "rgba(255,255,255,.82)";
+          ctx.font = p.human ? "900 11px system-ui" : "800 10px system-ui";
+          ctx.textAlign = "center";
+          ctx.fillText(p.name, p.x, p.y + 44);
         }
         for (const q of g.particles as Particle[]) { ctx.globalAlpha = clamp(q.life / q.max, 0, 1); ctx.fillStyle = q.color; ctx.beginPath(); ctx.arc(q.x, q.y, q.size, 0, TAU); ctx.fill(); } ctx.globalAlpha = 1;
         for (const f of g.floaters as FloatText[]) { ctx.globalAlpha = clamp(f.life, 0, 1); ctx.fillStyle = f.color; ctx.font = `900 ${f.size}px system-ui`; ctx.textAlign = "center"; ctx.fillText(f.text, f.x, f.y); } ctx.globalAlpha = 1;
@@ -316,20 +412,20 @@ export default function FuseRushGame() {
         <div className="topbar"><div className="pill">🏆 {hud.score}</div><div className={`pill ${hud.fuse < 2 ? "hot" : ""}`}>👥 {hud.alive} LEFT</div><div className="pill good">🪙 {profile.coins}</div></div>
         <div className="streaks"><span className="mini-pill">KO {hud.kos}</span>{hud.koStreak > 1 && <span className="mini-pill hot-mini">🔥 KO x{hud.koStreak}</span>}{hud.survivalStreak > 1 && <span className="mini-pill">⚡ SURVIVE x{hud.survivalStreak}</span>}{hud.combo > 1 && <span className="mini-pill">PASS x{hud.combo}</span>}</div>
         {hud.event && <div className="event-banner">{hud.event}</div>}{hud.final3 && <div className="final3-badge">FINAL 3 • NO MERCY</div>}
-        <div className="center-callout"><div className="bomb-time">{hud.fuse.toFixed(hud.fuse < 2 ? 1 : 0)}</div><div className="bomb-label">💣 {hud.carrier === "YOU" ? "YOU HAVE THE BOMB" : `${hud.carrier} HAS IT`}</div></div>
+        <div className="center-callout"><div className="bomb-time">{hud.fuse.toFixed(hud.fuse < 2 ? 1 : 0)}</div><div className="bomb-label">💣 {hud.carrier === "YOU" ? "YOU HAVE THE BOMB" : `${hud.carrier} HAS THE BOMB`}</div><div className="game-hint">{hud.carrier === "YOU" ? "CHASE + TOUCH SOMEONE TO PASS IT" : "KEEP AWAY • PUSH RIVALS • SURVIVE"}</div></div>
         <div className="joystick-base"><div className="joystick-knob" style={{ "--jx": `${stick.x}px`, "--jy": `${stick.y}px` } as React.CSSProperties} /></div>
         <div className="action-stack"><button className={`action push ${pushReady ? "" : "cool"}`} onPointerDown={(e) => { e.stopPropagation(); push(); }}>PUSH</button><button className={`action dash ${dashReady ? "" : "cool"}`} onPointerDown={(e) => { e.stopPropagation(); dash(); }}>DASH</button></div>
       </div>}
 
       {runState === "menu" && <section className="overlay"><div className="card">
-        <div className="brand">FUSE<span>RUSH</span></div><p className="tagline">Pass the bomb. Knock rivals into danger. Survive the shrinking arena. Every round gets faster.</p>
+        <div className="brand">FUSE<span>RUSH</span></div><p className="tagline">Hot-potato survival: if you have the bomb, chase and touch another player before the timer hits zero. If someone else has it, escape, PUSH them away, and survive until you are the last player standing.</p>
         <div className="character-title">CHOOSE YOUR RUNNER</div>
         <div className="character-picker">
           <button className={`character ${skin === "blonde" ? "selected" : ""}`} onClick={() => setSkin("blonde")}><img src="/sprites/blonde-idle.webp" alt="Blaze" /><b>Blaze</b><small>Fast • fearless</small></button>
           <button className={`character ${skin === "dark" ? "selected" : ""}`} onClick={() => setSkin("dark")}><img src="/sprites/dark-idle.webp" alt="Nyx" /><b>Nyx</b><small>Cool • tactical</small></button>
         </div>
         <div className="stats"><div className="stat"><b>{profile.coins}</b><small>Coins</small></div><div className="stat"><b>{profile.xp}</b><small>XP</small></div><div className="stat"><b>{profile.best}</b><small>Best</small></div></div>
-        <button className="play" onClick={startGame}>PLAY NOW</button><div className="help">Mobile: left thumb moves • PUSH knocks rivals • DASH escapes. Desktop: WASD/arrows • F/E push • Space/Shift dash.</div>
+        <button className="play" onClick={startGame}>PLAY NOW</button><div className="help">Goal: be the last survivor. Mobile: left thumb moves • PUSH knocks rivals away • DASH escapes. Desktop: WASD/arrows • F/E push • Space/Shift dash.</div>
       </div></section>}
 
       {runState === "result" && <section className="overlay"><div className="card">
