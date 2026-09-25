@@ -1924,7 +1924,7 @@ export default function FuseRushGame() {
           {hud.roundBanner && <div className="round-banner">{hud.roundBanner}</div>}
 
           <div className="fight-callout">
-            {fighterTuning(skin).name} • {fighterTuning(skin).style}
+            {selectedRosterFighter.name} • {fighterTuning(selectedRosterFighter.skin).style}
           </div>
 
           <div className="combat-meter">
@@ -2017,19 +2017,20 @@ export default function FuseRushGame() {
       )}
 
       {runState === "menu" && (
-        <section className="overlay">
-          <div className="card">
-            <div className="brand">
-              DENUEL<span>FIGHT</span>
+        <section className="overlay fighter-select-overlay">
+          <div className="card fighter-select-card-shell">
+            <div className="fighter-game-logo">
+              <span>DENUEL</span>
+              <strong>FIGHT</strong>
             </div>
 
-            <p className="tagline">
-              Choose from the new fully animated fighters or the original classic fighters, then enter the stage and fight with punches, kicks, blocks, combos and weapons.
-            </p>
+            <div className="fighter-select-heading">
+              <span>◆</span>
+              <strong>CHOOSE YOUR FIGHTER</strong>
+              <span>◆</span>
+            </div>
 
-            <div className="character-title">CHOOSE YOUR FIGHTER</div>
-
-            <div className="fighter-roster">
+            <div className="fighter-select-grid">
               {FIGHTER_ROSTER.map((fighter) => {
                 const selected = fighterChoice === fighter.id;
                 const isPhaseOne = fighter.visualStyle === "phase1";
@@ -2039,69 +2040,127 @@ export default function FuseRushGame() {
                 return (
                   <button
                     key={fighter.id}
-                    className={`fighter-card ${selected ? "selected" : ""} ${isPhaseOne ? "phase1" : "classic"}`}
+                    className={`select-fighter-card ${selected ? "selected" : ""}`}
+                    style={{ "--fighter-accent": fighter.accent } as React.CSSProperties}
                     onClick={() => {
                       setFighterChoice(fighter.id);
                       setSkin(fighter.skin);
                     }}
                   >
-                    <span className={`fighter-badge ${isPhaseOne ? "new" : "old"}`}>
-                      {fighter.badge}
+                    <span className="select-card-art">
+                      {isPhaseOne ? (
+                        <span
+                          className="select-atlas-preview"
+                          style={{ backgroundImage: `url(${atlasSource})` }}
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <img
+                          src={`/sprites/${fighter.skin}-idle.webp`}
+                          alt={fighter.name}
+                        />
+                      )}
                     </span>
 
-                    {isPhaseOne ? (
-                      <span
-                        className="fighter-atlas-preview"
-                        style={{
-                          backgroundImage: `url(${atlasSource})`,
-                        }}
-                        aria-hidden="true"
-                      />
-                    ) : (
-                      <img
-                        src={`/sprites/${fighter.skin}-idle.webp`}
-                        alt={fighter.name}
-                      />
-                    )}
-
-                    <b>{fighter.name}</b>
-                    <small>{fighter.subtitle}</small>
+                    <span className="select-card-footer">
+                      <b>{fighter.name}</b>
+                      <small>{fighter.badge}</small>
+                    </span>
                   </button>
                 );
               })}
+
+              {["Sahin", "Leon", "Vex", "Hana", "Kai", "Rei", "Lumi", "Bram"].map(
+                (name, index) => (
+                  <button
+                    key={name}
+                    className="select-fighter-card locked"
+                    disabled
+                    aria-label={`${name} coming soon`}
+                  >
+                    <span className="locked-silhouette">
+                      {index % 3 === 0 ? "◈" : index % 3 === 1 ? "✦" : "◆"}
+                    </span>
+                    <span className="select-card-footer">
+                      <b>{name}</b>
+                      <small>LOCKED</small>
+                    </span>
+                  </button>
+                )
+              )}
             </div>
 
-            <div className="selected-fighter-info">
-              <strong>
-                {(FIGHTER_ROSTER.find((fighter) => fighter.id === fighterChoice) ??
-                  FIGHTER_ROSTER[0]).name}
-              </strong>
-              <span>
-                {fighterTuning(skin).style} • {fighterTuning(skin).specialName}
-              </span>
+            <div
+              className="fighter-detail-panel"
+              style={{ "--fighter-accent": selectedRosterFighter.accent } as React.CSSProperties}
+            >
+              <div className="fighter-detail-art">
+                {selectedRosterFighter.visualStyle === "phase1" ? (
+                  <span
+                    className="detail-atlas-preview"
+                    style={{
+                      backgroundImage: `url(${
+                        selectedRosterFighter.skin === "blonde"
+                          ? BLAZE_ATLAS
+                          : NYX_ATLAS
+                      })`,
+                    }}
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <img
+                    src={`/sprites/${selectedRosterFighter.skin}-idle.webp`}
+                    alt={selectedRosterFighter.name}
+                  />
+                )}
+              </div>
+
+              <div className="fighter-detail-copy">
+                <div className="fighter-detail-name">
+                  <span>✦</span>
+                  <strong>{selectedRosterFighter.name}</strong>
+                </div>
+
+                <p>{selectedRosterFighter.description}</p>
+
+                {[
+                  ["ATTACK", selectedRosterFighter.attack],
+                  ["DEFENSE", selectedRosterFighter.defense],
+                  ["SPEED", selectedRosterFighter.speedStat],
+                  ["TECHNIQUE", selectedRosterFighter.technique],
+                ].map(([label, value]) => (
+                  <div className="fighter-stat-row" key={String(label)}>
+                    <span>{label}</span>
+                    <div className="fighter-stat-track">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <i
+                          key={i}
+                          className={i < Number(value) ? "filled" : ""}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                <div className="fighter-style-line">
+                  {selectedRosterFighter.subtitle} •{" "}
+                  {fighterTuning(selectedRosterFighter.skin).specialName}
+                </div>
+              </div>
             </div>
 
-            <div className="stats">
-              <div className="stat">
-                <b>{profile.coins}</b>
-                <small>Coins</small>
-              </div>
-              <div className="stat">
-                <b>{profile.xp}</b>
-                <small>XP</small>
-              </div>
-              <div className="stat">
-                <b>{profile.best}</b>
-                <small>Best</small>
-              </div>
+            <div className="select-profile-strip">
+              <span>🪙 {profile.coins}</span>
+              <span>XP {profile.xp}</span>
+              <span>BEST {profile.best}</span>
             </div>
 
-            <button className="play" onClick={startGame}>
-              START FIGHT
+            <button className="play fighter-select-button" onClick={startGame}>
+              SELECT & FIGHT
             </button>
 
-            <div className="help">
-              Mobile: move left/right • walk over weapons to pick them up • PUNCH becomes the weapon attack • KICK • hold BLOCK • SPECIAL at 100% • DASH. Desktop: A/D or arrows • J/F attack • K/E kick • L block • U/Q special • Space/Shift dash.
+            <div className="help fighter-select-help">
+              The selected fighter keeps the same appearance, stats, style and special move in the match.
             </div>
           </div>
         </section>
