@@ -306,10 +306,44 @@ export default function FuseRushGame() {
     };
     setProfile(stored);
 
+    const legacyStates = ["idle", "run1", "run2", "push"] as const;
     (["blonde", "dark"] as Skin[]).forEach((character) => {
-      (["idle", "run1", "run2", "push"] as const).forEach((state) => {
+      legacyStates.forEach((state) => {
         const img = new Image();
         img.src = `/sprites/${character}-${state}.webp`;
+        imagesRef.current[`${character}-${state}`] = img;
+      });
+    });
+
+    const phaseOneFrames = [
+      "idle",
+      "walk1",
+      "walk2",
+      "walk3",
+      "punch-windup",
+      "punch-hit",
+      "punch-recover",
+      "kick-windup",
+      "kick-hit",
+      "kick-recover",
+      "block",
+      "hurt",
+      "knockdown",
+      "getup",
+      "weapon-idle",
+      "weapon-walk1",
+      "weapon-walk2",
+      "weapon-attack",
+      "victory",
+    ] as const;
+
+    ([
+      { skin: "blonde" as Skin, file: "blaze" },
+      { skin: "dark" as Skin, file: "nyx" },
+    ]).forEach(({ skin: character, file }) => {
+      phaseOneFrames.forEach((state) => {
+        const img = new Image();
+        img.src = `/sprites/${file}-${state}.webp`;
         imagesRef.current[`${character}-${state}`] = img;
       });
     });
@@ -1523,26 +1557,80 @@ export default function FuseRushGame() {
           const runFrame =
             Math.floor((t + fighter.id * 89) / 110) % 2 === 0 ? "run1" : "run2";
 
-          let spriteState = moving ? runFrame : "idle";
-          if (fighter.attackType === "punch" && attacking && !fighter.weapon) {
-            const p = attackProgressSafe(t, fighter, 250);
-            spriteState = p < 0.16 ? "idle" : p < 0.76 ? "push" : "idle";
+          let spriteState = "idle";
+          const walkPhase = Math.floor(t / 105) % 4;
+
+          if (moving) {
+            spriteState =
+              walkPhase === 0
+                ? "walk1"
+                : walkPhase === 1
+                  ? "walk2"
+                  : walkPhase === 2
+                    ? "walk3"
+                    : "walk2";
           }
+
+          if (fighter.weapon) {
+            spriteState = moving
+              ? Math.floor(t / 115) % 2 === 0
+                ? "weapon-walk1"
+                : "weapon-walk2"
+              : "weapon-idle";
+          }
+
+          if (fighter.attackType === "punch" && attacking) {
+            const punchDuration =
+              fighter.weapon === "hammer"
+                ? 340
+                : fighter.weapon === "bat"
+                  ? 285
+                  : fighter.weapon === "blade"
+                    ? 245
+                    : 250;
+            const p = attackProgressSafe(t, fighter, punchDuration);
+
+            spriteState = fighter.weapon
+              ? "weapon-attack"
+              : p < 0.28
+                ? "punch-windup"
+                : p < 0.68
+                  ? "punch-hit"
+                  : "punch-recover";
+          }
+
           if (fighter.attackType === "kick" && attacking) {
             const p = attackProgressSafe(t, fighter, 390);
-            spriteState = p < 0.22 ? "run1" : p < 0.78 ? "run2" : "idle";
+            spriteState =
+              p < 0.3
+                ? "kick-windup"
+                : p < 0.7
+                  ? "kick-hit"
+                  : "kick-recover";
           }
-          if (guarding) spriteState = "idle";
+
+          if (guarding) spriteState = "block";
+          if (hurt) spriteState = "hurt";
+          if (knockedOut) spriteState = "knockdown";
 
           const preferredImg = imagesRef.current[`${fighter.skin}-${spriteState}`];
+          const legacyKey =
+            spriteState.startsWith("walk") || spriteState.startsWith("weapon-walk")
+              ? `${fighter.skin}-${Math.floor(t / 130) % 2 === 0 ? "run1" : "run2"}`
+              : spriteState.startsWith("punch") || spriteState === "weapon-attack"
+                ? `${fighter.skin}-push`
+                : `${fighter.skin}-idle`;
+          const legacyImg = imagesRef.current[legacyKey];
           const idleImg = imagesRef.current[`${fighter.skin}-idle`];
           const fallbackImg = imagesRef.current["blonde-idle"];
           const img =
             preferredImg?.complete && preferredImg.naturalWidth > 0
               ? preferredImg
-              : idleImg?.complete && idleImg.naturalWidth > 0
-                ? idleImg
-                : fallbackImg;
+              : legacyImg?.complete && legacyImg.naturalWidth > 0
+                ? legacyImg
+                : idleImg?.complete && idleImg.naturalWidth > 0
+                  ? idleImg
+                  : fallbackImg;
 
           const size = fighter.human ? 104 : 98;
           const feetY = g.groundY;
