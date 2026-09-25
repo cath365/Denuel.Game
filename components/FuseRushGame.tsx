@@ -63,7 +63,7 @@ export default function FuseRushGame() {
     };
     setProfile(p);
     (["blonde", "dark"] as Skin[]).forEach((character) => {
-      (["idle", "run1", "push"] as const).forEach((state) => {
+      (["idle", "run1", "run2", "push"] as const).forEach((state) => {
         const img = new Image();
         img.src = `/sprites/${character}-${state}.webp`;
         imagesRef.current[`${character}-${state}`] = img;
@@ -288,7 +288,7 @@ export default function FuseRushGame() {
           const dashing = t < p.dashUntil;
           const attacking = t < p.attackUntil;
           const hurt = t < p.stunnedUntil;
-          const runFrame = Math.floor((t + p.id * 79) / 125) % 2 === 0 ? "idle" : "run1";
+          const runFrame = Math.floor((t + p.id * 79) / 105) % 2 === 0 ? "run1" : "run2";
           const spriteState = attacking ? "push" : moving ? runFrame : "idle";
           const primary = imagesRef.current[`${p.skin}-${spriteState}`];
           const fallback = imagesRef.current[`${p.skin}-idle`] || imagesRef.current["blonde-idle"];
