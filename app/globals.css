@@ -1498,3 +1498,52 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
     padding:4px 6px;
   }
 }
+
+
+/* Uploaded fantasy roster portraits */
+.fantasy-roster-preview,
+.fantasy-detail-preview {
+  display:block;
+  width:100%;
+  height:100%;
+  background-image:url("/characters/fantasy-roster.webp");
+  background-repeat:no-repeat;
+  background-size:400% 300%;
+  filter:drop-shadow(0 8px 8px rgba(0,0,0,.36));
+}
+
+.fantasy-roster-preview {
+  transform:scale(1.08);
+  transform-origin:center;
+}
+
+.fantasy-detail-preview {
+  position:absolute;
+  inset:0;
+  transform:scale(1.08);
+  transform-origin:center;
+}
+
+.select-fighter-card:has(.fantasy-roster-preview) {
+  background:
+    radial-gradient(circle at 50% 22%,color-mix(in srgb,var(--fighter-accent,#7d8ba2) 32%,#d7e1ee),transparent 62%),
+    linear-gradient(180deg,#46536a,#202735);
+}
+
+.select-fighter-card:has(.fantasy-roster-preview) .select-card-footer small {
+  color:#9ff2d9;
+}
+
+@media (max-width:620px) {
+  .fantasy-roster-preview {
+    transform:scale(1.12);
+  }
+
+  .fantasy-detail-preview {
+    transform:scale(1.1);
+  }
+
+  .fighter-select-grid {
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+}
