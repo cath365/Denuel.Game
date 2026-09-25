@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BLAZE_ATLAS, NYX_ATLAS } from "./sprite-data/atlases";
 
 type Skin = "blonde" | "dark";
 type RunState = "menu" | "playing" | "result";
@@ -98,6 +99,58 @@ type Result = {
 
 const BOT_NAMES = ["Nova", "Rex"];
 const BOT_COLORS = ["#ff5c86", "#53dfb0"];
+
+const FRAME_INDEX = {
+  idle: 0,
+  walk1: 1,
+  walk2: 2,
+  walk3: 3,
+  "punch-windup": 4,
+  "punch-hit": 5,
+  "punch-recover": 6,
+  "kick-windup": 7,
+  "kick-hit": 8,
+  "kick-recover": 9,
+  block: 10,
+  hurt: 11,
+  knockdown: 12,
+  getup: 13,
+  "weapon-idle": 14,
+  "weapon-walk1": 15,
+  "weapon-walk2": 16,
+  "weapon-attack": 17,
+  victory: 18,
+} as const;
+
+type SpriteFrame = keyof typeof FRAME_INDEX;
+
+const ATLAS_CELL_W = 128;
+const ATLAS_CELL_H = 85;
+const ATLAS_COLS = 5;
+
+function drawAtlasFrame(
+  ctx: CanvasRenderingContext2D,
+  atlas: HTMLImageElement,
+  frame: SpriteFrame,
+  width: number,
+  height: number
+) {
+  const index = FRAME_INDEX[frame];
+  const sx = (index % ATLAS_COLS) * ATLAS_CELL_W;
+  const sy = Math.floor(index / ATLAS_COLS) * ATLAS_CELL_H;
+
+  ctx.drawImage(
+    atlas,
+    sx,
+    sy,
+    ATLAS_CELL_W,
+    ATLAS_CELL_H,
+    -width / 2,
+    -height,
+    width,
+    height
+  );
+}
 
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
@@ -250,6 +303,10 @@ export default function FuseRushGame() {
   const rafRef = useRef<number | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
   const imagesRef = useRef<Record<string, HTMLImageElement>>({});
+  const atlasRef = useRef<Record<Skin, HTMLImageElement | null>>({
+    blonde: null,
+    dark: null,
+  });
   const stageRef = useRef<HTMLImageElement | null>(null);
   const inputRef = useRef({
     keys: new Set<string>(),
@@ -315,38 +372,13 @@ export default function FuseRushGame() {
       });
     });
 
-    const phaseOneFrames = [
-      "idle",
-      "walk1",
-      "walk2",
-      "walk3",
-      "punch-windup",
-      "punch-hit",
-      "punch-recover",
-      "kick-windup",
-      "kick-hit",
-      "kick-recover",
-      "block",
-      "hurt",
-      "knockdown",
-      "getup",
-      "weapon-idle",
-      "weapon-walk1",
-      "weapon-walk2",
-      "weapon-attack",
-      "victory",
-    ] as const;
+    const blazeAtlas = new Image();
+    blazeAtlas.src = BLAZE_ATLAS;
+    atlasRef.current.blonde = blazeAtlas;
 
-    ([
-      { skin: "blonde" as Skin, file: "blaze" },
-      { skin: "dark" as Skin, file: "nyx" },
-    ]).forEach(({ skin: character, file }) => {
-      phaseOneFrames.forEach((state) => {
-        const img = new Image();
-        img.src = `/sprites/${file}-${state}.webp`;
-        imagesRef.current[`${character}-${state}`] = img;
-      });
-    });
+    const nyxAtlas = new Image();
+    nyxAtlas.src = NYX_ATLAS;
+    atlasRef.current.dark = nyxAtlas;
 
     const stage = new Image();
     stage.src = "/backgrounds/denuel-stage.svg";
@@ -522,6 +554,7 @@ export default function FuseRushGame() {
       nextRoundAt: 0,
       matchFinishAt: 0,
       matchWinner: false,
+      roundWinnerId: null as number | null,
     };
 
     setHud({
@@ -1161,6 +1194,7 @@ export default function FuseRushGame() {
       g.roundStartedAt = now;
       g.roundActive = true;
       g.nextRoundAt = 0;
+      g.roundWinnerId = null;
       g.comboSequence = [];
       g.comboWindowUntil = 0;
       g.weapons = [
@@ -1190,11 +1224,16 @@ export default function FuseRushGame() {
       setBlocking(false);
 
       if (playerWon) {
+        g.roundWinnerId = 0;
         g.playerRounds += 1;
         g.score += 500;
         g.roundBanner = "ROUND WON";
         beep(660, 0.12, 0.055, "square");
       } else {
+        const survivingEnemy = (g.fighters as Fighter[])
+          .filter((fighter) => !fighter.human && fighter.alive)
+          .sort((a, b) => b.hp - a.hp)[0];
+        g.roundWinnerId = survivingEnemy?.id ?? 1;
         g.enemyRounds += 1;
         g.roundBanner = "ROUND LOST";
         beep(105, 0.16, 0.055, "sawtooth");
@@ -1554,90 +1593,75 @@ export default function FuseRushGame() {
           const hurt = !knockedOut && t < fighter.stunUntil;
           const guarding = !knockedOut && (fighter.blocking || t < fighter.blockUntil);
 
-          const runFrame =
-            Math.floor((t + fighter.id * 89) / 110) % 2 === 0 ? "run1" : "run2";
+          const attackDuration = Math.max(
+            1,
+            fighter.attackUntil - fighter.attackStartedAt
+          );
+          const actionProgress = attacking
+            ? clamp((t - fighter.attackStartedAt) / attackDuration, 0, 1)
+            : 0;
 
-          let spriteState = "idle";
-          const walkPhase = Math.floor(t / 105) % 4;
+          let spriteFrame: SpriteFrame = "idle";
 
-          if (moving) {
-            spriteState =
-              walkPhase === 0
-                ? "walk1"
-                : walkPhase === 1
-                  ? "walk2"
-                  : walkPhase === 2
-                    ? "walk3"
-                    : "walk2";
-          }
-
-          if (fighter.weapon) {
-            spriteState = moving
-              ? Math.floor(t / 115) % 2 === 0
-                ? "weapon-walk1"
-                : "weapon-walk2"
-              : "weapon-idle";
-          }
-
-          if (fighter.attackType === "punch" && attacking) {
-            const punchDuration =
-              fighter.weapon === "hammer"
-                ? 340
-                : fighter.weapon === "bat"
-                  ? 285
-                  : fighter.weapon === "blade"
-                    ? 245
-                    : 250;
-            const p = attackProgressSafe(t, fighter, punchDuration);
-
-            spriteState = fighter.weapon
-              ? "weapon-attack"
-              : p < 0.28
+          if (!g.roundActive && fighter.id === g.roundWinnerId && fighter.alive) {
+            spriteFrame = "victory";
+          } else if (knockedOut) {
+            spriteFrame = "knockdown";
+          } else if (hurt) {
+            spriteFrame = "hurt";
+          } else if (guarding) {
+            spriteFrame = "block";
+          } else if (fighter.weapon) {
+            if (attacking && fighter.attackType === "punch") {
+              spriteFrame = "weapon-attack";
+            } else if (moving) {
+              spriteFrame =
+                Math.floor((t + fighter.id * 67) / 115) % 2 === 0
+                  ? "weapon-walk1"
+                  : "weapon-walk2";
+            } else {
+              spriteFrame = "weapon-idle";
+            }
+          } else if (attacking && fighter.attackType === "punch") {
+            spriteFrame =
+              actionProgress < 0.28
                 ? "punch-windup"
-                : p < 0.68
+                : actionProgress < 0.68
                   ? "punch-hit"
                   : "punch-recover";
-          }
-
-          if (fighter.attackType === "kick" && attacking) {
-            const p = attackProgressSafe(t, fighter, 390);
-            spriteState =
-              p < 0.3
+          } else if (attacking && fighter.attackType === "kick") {
+            spriteFrame =
+              actionProgress < 0.3
                 ? "kick-windup"
-                : p < 0.7
+                : actionProgress < 0.7
                   ? "kick-hit"
                   : "kick-recover";
+          } else if (moving) {
+            const walkFrames: SpriteFrame[] = ["walk1", "walk2", "walk3", "walk2"];
+            spriteFrame =
+              walkFrames[
+                Math.floor((t + fighter.id * 79) / 105) % walkFrames.length
+              ];
           }
 
-          if (guarding) spriteState = "block";
-          if (hurt) spriteState = "hurt";
-          if (knockedOut) spriteState = "knockdown";
+          const atlas = atlasRef.current[fighter.skin];
+          const atlasReady = !!(
+            atlas?.complete &&
+            atlas.naturalWidth >= ATLAS_CELL_W &&
+            atlas.naturalHeight >= ATLAS_CELL_H
+          );
+          const fallbackImg =
+            imagesRef.current[`${fighter.skin}-idle`] ||
+            imagesRef.current["blonde-idle"];
 
-          const preferredImg = imagesRef.current[`${fighter.skin}-${spriteState}`];
-          const legacyKey =
-            spriteState.startsWith("walk") || spriteState.startsWith("weapon-walk")
-              ? `${fighter.skin}-${Math.floor(t / 130) % 2 === 0 ? "run1" : "run2"}`
-              : spriteState.startsWith("punch") || spriteState === "weapon-attack"
-                ? `${fighter.skin}-push`
-                : `${fighter.skin}-idle`;
-          const legacyImg = imagesRef.current[legacyKey];
-          const idleImg = imagesRef.current[`${fighter.skin}-idle`];
-          const fallbackImg = imagesRef.current["blonde-idle"];
-          const img =
-            preferredImg?.complete && preferredImg.naturalWidth > 0
-              ? preferredImg
-              : legacyImg?.complete && legacyImg.naturalWidth > 0
-                ? legacyImg
-                : idleImg?.complete && idleImg.naturalWidth > 0
-                  ? idleImg
-                  : fallbackImg;
-
-          const size = fighter.human ? 104 : 98;
+          const spriteH = fighter.human ? 112 : 106;
+          const spriteW = Math.round(spriteH * (ATLAS_CELL_W / ATLAS_CELL_H));
+          const size = spriteH;
           const feetY = g.groundY;
           const phase = t * (moving ? 0.024 : 0.007) + fighter.id;
           const bob = moving ? -Math.abs(Math.sin(phase)) * 4 : Math.sin(phase) * 1.3;
 
-          if (dashing && img?.complete) {
+          if (dashing && atlasReady && atlas) {
             for (let ghost = 3; ghost >= 1; ghost--) {
               ctx.save();
               ctx.globalAlpha = ghost * 0.07;
@@ -1646,7 +1670,7 @@ export default function FuseRushGame() {
                 feetY + bob
               );
               if (fighter.facing < 0) ctx.scale(-1, 1);
-              ctx.drawImage(img, -size / 2, -size, size, size);
+              drawAtlasFrame(ctx, atlas, spriteFrame, spriteW, spriteH);
               ctx.restore();
             }
           }
@@ -1669,9 +1693,9 @@ export default function FuseRushGame() {
           const strikeCurve = Math.sin(Math.min(1, attackProgress) * Math.PI);
           const lunge =
             fighter.attackType === "punch"
-              ? strikeCurve * 11
+              ? strikeCurve * 4
               : fighter.attackType === "kick"
-                ? strikeCurve * 8
+                ? strikeCurve * 3
                 : 0;
 
           ctx.save();
@@ -1679,16 +1703,8 @@ export default function FuseRushGame() {
 
           if (fighter.facing < 0) ctx.scale(-1, 1);
 
-          if (knockedOut) {
-            ctx.rotate(fighter.facing * 1.28);
-            ctx.translate(0, 24);
-          } else if (guarding) {
-            ctx.rotate(-fighter.facing * 0.09);
-            ctx.scale(0.96, 0.96);
-          } else if (fighter.attackType === "kick" && attacking) {
-            ctx.rotate(-0.12 * strikeCurve);
-          } else if (hurt) {
-            ctx.rotate(Math.sin(t * 0.055) * 0.16);
+          if (hurt && !knockedOut) {
+            ctx.rotate(Math.sin(t * 0.055) * 0.06);
           }
 
           if (fighter.human) {
@@ -1696,60 +1712,21 @@ export default function FuseRushGame() {
             ctx.shadowColor = "rgba(140,124,255,.75)";
           }
 
-          if (img?.complete && img.naturalWidth > 0) {
-            ctx.drawImage(img, -size / 2, -size, size, size);
+          if (atlasReady && atlas) {
+            drawAtlasFrame(ctx, atlas, spriteFrame, spriteW, spriteH);
+          } else if (fallbackImg?.complete && fallbackImg.naturalWidth > 0) {
+            ctx.drawImage(
+              fallbackImg,
+              -spriteH / 2,
+              -spriteH,
+              spriteH,
+              spriteH
+            );
           } else {
             ctx.fillStyle = fighter.color;
             ctx.beginPath();
             ctx.arc(0, -45, 20, 0, Math.PI * 2);
             ctx.fill();
-          }
-
-          if (fighter.attackType === "punch" && attacking && !fighter.weapon) {
-            const armColor = fighter.skin === "blonde" ? "#315b9a" : "#245b73";
-            const extension = 20 + strikeCurve * 38;
-            ctx.strokeStyle = armColor;
-            ctx.lineWidth = 13;
-            ctx.lineCap = "round";
-            ctx.beginPath();
-            ctx.moveTo(10, -62);
-            ctx.lineTo(extension, -63);
-            ctx.stroke();
-
-            ctx.fillStyle = "#f3c19b";
-            ctx.beginPath();
-            ctx.arc(extension + 8, -63, 8, 0, Math.PI * 2);
-            ctx.fill();
-          }
-
-          if (fighter.attackType === "kick" && attacking) {
-            const legColor = fighter.skin === "blonde" ? "#204b8f" : "#26334b";
-            ctx.strokeStyle = legColor;
-            ctx.lineWidth = 14;
-            ctx.lineCap = "round";
-            ctx.beginPath();
-            ctx.moveTo(7, -38);
-            ctx.lineTo(22 + strikeCurve * 42, -34 - strikeCurve * 5);
-            ctx.stroke();
-
-            ctx.strokeStyle = "#17202e";
-            ctx.lineWidth = 17;
-            ctx.beginPath();
-            ctx.moveTo(22 + strikeCurve * 40, -34 - strikeCurve * 5);
-            ctx.lineTo(31 + strikeCurve * 49, -33 - strikeCurve * 4);
-            ctx.stroke();
-          }
-
-          if (fighter.weapon && !knockedOut) {
-            ctx.save();
-            ctx.translate(14, -58);
-            drawWeaponShape(
-              ctx,
-              fighter.weapon,
-              fighter.human ? 0.88 : 0.82,
-              fighter.attackType === "punch" && attacking ? strikeCurve : 0
-            );
-            ctx.restore();
           }
 
           ctx.restore();
@@ -1765,11 +1742,11 @@ export default function FuseRushGame() {
                 : 58 + strikeCurve * 45;
 
             ctx.save();
-            ctx.globalAlpha = 0.28 + strikeCurve * 0.5;
+            ctx.globalAlpha = 0.12 + strikeCurve * 0.22;
             ctx.strokeStyle =
               activeWeapon?.color ||
               (fighter.attackType === "punch" ? "#fff0a4" : "#ffb05a");
-            ctx.lineWidth = fighter.attackType === "punch" ? 5 : 7;
+            ctx.lineWidth = fighter.attackType === "punch" ? 3 : 4;
             ctx.beginPath();
             ctx.arc(
               fighter.x + fighter.facing * reach,
@@ -1777,25 +1754,6 @@ export default function FuseRushGame() {
               fighter.attackType === "punch" ? 22 : 28,
               fighter.facing > 0 ? -0.8 : Math.PI - 0.8,
               fighter.facing > 0 ? 0.8 : Math.PI + 0.8
-            );
-            ctx.stroke();
-            ctx.restore();
-          }
-
-          if (guarding) {
-            ctx.save();
-            ctx.globalAlpha = 0.58;
-            ctx.strokeStyle = "#8fe8ff";
-            ctx.lineWidth = 5;
-            ctx.shadowBlur = 12;
-            ctx.shadowColor = "#57d7ff";
-            ctx.beginPath();
-            ctx.arc(
-              fighter.x + fighter.facing * 24,
-              feetY - 57,
-              31,
-              fighter.facing > 0 ? -1.2 : Math.PI - 1.2,
-              fighter.facing > 0 ? 1.2 : Math.PI + 1.2
             );
             ctx.stroke();
             ctx.restore();
