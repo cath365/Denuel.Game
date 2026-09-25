@@ -448,3 +448,119 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
     height: 44px;
   }
 }
+
+
+.round-scoreboard {
+  position: absolute;
+  left: 50%;
+  top: 124px;
+  transform: translateX(-50%);
+  width: min(390px, calc(100vw - 28px));
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(8,16,38,.58);
+  border: 1px solid rgba(255,255,255,.16);
+  backdrop-filter: blur(9px);
+  font-size: 10px;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  color: #f8fbff;
+  text-shadow: 0 2px 8px rgba(0,0,0,.45);
+}
+
+.round-side:last-child {
+  text-align: right;
+}
+
+.round-side b {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  margin: 0 3px;
+  border-radius: 999px;
+  background: rgba(140,124,255,.28);
+  border: 1px solid rgba(255,255,255,.18);
+  font-size: 12px;
+}
+
+.round-center {
+  color: #ffe889;
+}
+
+.round-banner {
+  position: absolute;
+  left: 50%;
+  top: 31%;
+  transform: translate(-50%, -50%);
+  z-index: 7;
+  min-width: min(330px, 72vw);
+  padding: 14px 20px;
+  border-radius: 18px;
+  text-align: center;
+  font-size: clamp(22px, 6vw, 40px);
+  font-weight: 1000;
+  letter-spacing: .08em;
+  color: #ffffff;
+  background: linear-gradient(135deg, rgba(69,87,255,.88), rgba(255,83,116,.88));
+  border: 2px solid rgba(255,255,255,.34);
+  box-shadow: 0 18px 55px rgba(0,0,0,.34);
+  text-shadow: 0 3px 12px rgba(0,0,0,.45);
+  animation: roundPop .22s ease-out;
+}
+
+@keyframes roundPop {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(.78); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+.match-score-result {
+  margin: 14px 0 8px;
+  text-align: center;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  color: #dfe7ff;
+}
+
+.fight-callout {
+  top: 158px;
+}
+
+.combat-meter {
+  top: 180px;
+}
+
+@media (max-width: 620px) {
+  .round-scoreboard {
+    top: 114px;
+    width: calc(100vw - 20px);
+    padding: 6px 8px;
+    font-size: 9px;
+    gap: 5px;
+  }
+
+  .round-side b {
+    min-width: 20px;
+    height: 20px;
+    font-size: 11px;
+  }
+
+  .round-banner {
+    top: 30%;
+    min-width: min(290px, 78vw);
+    padding: 12px 16px;
+  }
+
+  .fight-callout {
+    top: 147px;
+  }
+
+  .combat-meter {
+    top: 168px;
+  }
+}
