@@ -248,3 +248,85 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
     font-size: 11px;
   }
 }
+
+
+.combat-actions {
+  position: absolute;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(20px, env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-columns: 84px 84px;
+  grid-template-rows: 84px 58px;
+  gap: 10px;
+  pointer-events: auto;
+  align-items: center;
+  justify-items: center;
+}
+
+.action.punch-btn {
+  width: 84px;
+  height: 84px;
+  background: radial-gradient(circle at 35% 25%, #ffe48f, #ef8d29 60%, #a74315);
+  box-shadow: 0 10px 30px rgba(239,141,41,.34);
+}
+
+.action.kick-btn {
+  width: 84px;
+  height: 84px;
+  background: radial-gradient(circle at 35% 25%, #ff9c91, #ed4e65 60%, #8f2339);
+  box-shadow: 0 10px 30px rgba(237,78,101,.34);
+}
+
+.action.small-dash {
+  grid-column: 1 / span 2;
+  width: 118px;
+  height: 54px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.horizontal-stick {
+  bottom: max(38px, env(safe-area-inset-bottom));
+  width: 124px;
+  height: 84px;
+  border-radius: 999px;
+}
+
+.horizontal-stick .joystick-knob {
+  left: 37px;
+  top: 16px;
+}
+
+@media (max-width: 620px) {
+  .combat-actions {
+    right: 12px;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    grid-template-columns: 76px 76px;
+    grid-template-rows: 76px 50px;
+    gap: 8px;
+  }
+
+  .action.punch-btn,
+  .action.kick-btn {
+    width: 76px;
+    height: 76px;
+    font-size: 11px;
+  }
+
+  .action.small-dash {
+    width: 108px;
+    height: 48px;
+  }
+
+  .horizontal-stick {
+    left: 18px;
+    bottom: max(32px, env(safe-area-inset-bottom));
+    width: 116px;
+    height: 78px;
+  }
+
+  .horizontal-stick .joystick-knob {
+    left: 33px;
+    top: 14px;
+  }
+}
