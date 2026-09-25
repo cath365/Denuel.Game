@@ -1218,6 +1218,20 @@ export default function FuseRushGame() {
       const dir: 1 | -1 = dx >= 0 ? 1 : -1;
       bot.facing = dir;
 
+      if (!bot.weapon && distance > 105) {
+        const pickup = (g.weapons as WeaponPickup[])
+          .filter((item) => item.active)
+          .sort((a, b) => Math.abs(a.x - bot.x) - Math.abs(b.x - bot.x))[0];
+
+        if (pickup && Math.abs(pickup.x - bot.x) < 250) {
+          const weaponDir: 1 | -1 = pickup.x >= bot.x ? 1 : -1;
+          const tune = fighterTuning(bot.skin);
+          bot.facing = weaponDir;
+          bot.vx += weaponDir * 610 * tune.speed * dt;
+          return;
+        }
+      }
+
       if (distance > 92) {
         const tune = fighterTuning(bot.skin);
         bot.vx += dir * (distance > 200 ? 700 : 520) * tune.speed * dt;
@@ -1603,7 +1617,7 @@ export default function FuseRushGame() {
             ctx.fill();
           }
 
-          if (fighter.attackType === "punch" && attacking) {
+          if (fighter.attackType === "punch" && attacking && !fighter.weapon) {
             const armColor = fighter.skin === "blonde" ? "#315b9a" : "#245b73";
             const extension = 20 + strikeCurve * 38;
             ctx.strokeStyle = armColor;
