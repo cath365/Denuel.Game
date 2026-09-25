@@ -4,8 +4,24 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BLAZE_ATLAS, NYX_ATLAS } from "./sprite-data/atlases";
 
 type Skin = "blonde" | "dark";
-type VisualStyle = "phase1" | "classic";
-type FighterChoice = "blaze" | "nyx" | "classic-blaze" | "classic-nyx";
+type VisualStyle = "phase1" | "classic" | "fantasy";
+type FighterChoice =
+  | "blaze"
+  | "nyx"
+  | "sahin"
+  | "lumi"
+  | "vex"
+  | "sylva"
+  | "orin"
+  | "leon"
+  | "hana"
+  | "bram"
+  | "rei"
+  | "raze"
+  | "kai"
+  | "grim"
+  | "classic-blaze"
+  | "classic-nyx";
 type RunState = "menu" | "playing" | "result";
 type AttackType = "punch" | "kick" | null;
 type WeaponType = "bat" | "hammer" | "blade" | null;
@@ -24,6 +40,7 @@ type Fighter = {
   choice: FighterChoice;
   skin: Skin;
   visualStyle: VisualStyle;
+  fantasyIndex: number | null;
   color: string;
   x: number;
   vx: number;
@@ -104,11 +121,14 @@ type Result = {
 const BOT_NAMES = ["Rex"];
 const BOT_COLORS = ["#ff5c86"];
 
+const FANTASY_ROSTER_URL = "/characters/fantasy-roster.webp";
+
 const FIGHTER_ROSTER: Array<{
   id: FighterChoice;
   name: string;
   skin: Skin;
   visualStyle: VisualStyle;
+  fantasyIndex: number | null;
   subtitle: string;
   badge: string;
   description: string;
@@ -117,12 +137,14 @@ const FIGHTER_ROSTER: Array<{
   defense: number;
   speedStat: number;
   technique: number;
+  specialName: string;
 }> = [
   {
     id: "blaze",
     name: "Blaze",
     skin: "blonde",
     visualStyle: "phase1",
+    fantasyIndex: null,
     subtitle: "Rushdown",
     badge: "NEW",
     description: "Fiery pressure fighter with fast punches and explosive forward attacks.",
@@ -131,12 +153,14 @@ const FIGHTER_ROSTER: Array<{
     defense: 3,
     speedStat: 5,
     technique: 4,
+    specialName: "BLAZE RUSH",
   },
   {
     id: "nyx",
     name: "Nyx",
     skin: "dark",
     visualStyle: "phase1",
+    fantasyIndex: null,
     subtitle: "Power Guard",
     badge: "NEW",
     description: "Tactical defender with strong kicks, better blocking and heavy counter attacks.",
@@ -145,12 +169,210 @@ const FIGHTER_ROSTER: Array<{
     defense: 5,
     speedStat: 3,
     technique: 5,
+    specialName: "NYX BREAKER",
   },
+
+  {
+    id: "sahin",
+    name: "Sahin",
+    skin: "blonde",
+    visualStyle: "fantasy",
+    fantasyIndex: 0,
+    subtitle: "Heavy Vanguard",
+    badge: "NEW",
+    description: "Armored frontline brawler built around powerful charges and heavy impact attacks.",
+    accent: "#d9a063",
+    attack: 5,
+    defense: 4,
+    speedStat: 3,
+    technique: 3,
+    specialName: "IRON CHARGE",
+  },
+  {
+    id: "lumi",
+    name: "Lumi",
+    skin: "blonde",
+    visualStyle: "fantasy",
+    fantasyIndex: 1,
+    subtitle: "Fire Mage",
+    badge: "NEW",
+    description: "Fast spell-fighter who pressures opponents with fiery bursts and quick movement.",
+    accent: "#ff7a38",
+    attack: 5,
+    defense: 2,
+    speedStat: 4,
+    technique: 5,
+    specialName: "FLAME BURST",
+  },
+  {
+    id: "vex",
+    name: "Vex",
+    skin: "dark",
+    visualStyle: "fantasy",
+    fantasyIndex: 2,
+    subtitle: "Shadow Rogue",
+    badge: "NEW",
+    description: "A tricky hooded fighter focused on counters, evasive movement and surprise attacks.",
+    accent: "#716a7c",
+    attack: 4,
+    defense: 3,
+    speedStat: 5,
+    technique: 5,
+    specialName: "SHADOW BREAK",
+  },
+  {
+    id: "sylva",
+    name: "Sylva",
+    skin: "dark",
+    visualStyle: "fantasy",
+    fantasyIndex: 3,
+    subtitle: "Forest Archer",
+    badge: "NEW",
+    description: "Agile ranged-inspired fighter with speed, precision and strong spacing control.",
+    accent: "#73934d",
+    attack: 4,
+    defense: 3,
+    speedStat: 5,
+    technique: 5,
+    specialName: "WIND SHOT",
+  },
+
+  {
+    id: "orin",
+    name: "Orin",
+    skin: "dark",
+    visualStyle: "fantasy",
+    fantasyIndex: 4,
+    subtitle: "Arcane Wizard",
+    badge: "NEW",
+    description: "Technical caster with strong control, careful defense and high-skill counter play.",
+    accent: "#546c9e",
+    attack: 4,
+    defense: 3,
+    speedStat: 3,
+    technique: 6,
+    specialName: "ARCANE PULSE",
+  },
+  {
+    id: "leon",
+    name: "Leon",
+    skin: "blonde",
+    visualStyle: "fantasy",
+    fantasyIndex: 5,
+    subtitle: "Knight Duelist",
+    badge: "NEW",
+    description: "Balanced swordsman with dependable offense, defense and straightforward combos.",
+    accent: "#9a9da5",
+    attack: 4,
+    defense: 4,
+    speedStat: 4,
+    technique: 4,
+    specialName: "STEEL SLASH",
+  },
+  {
+    id: "hana",
+    name: "Hana",
+    skin: "blonde",
+    visualStyle: "fantasy",
+    fantasyIndex: 6,
+    subtitle: "Blade Fighter",
+    badge: "NEW",
+    description: "Aggressive close-range fighter with quick sword pressure and strong combo potential.",
+    accent: "#9a6545",
+    attack: 5,
+    defense: 3,
+    speedStat: 4,
+    technique: 4,
+    specialName: "BLADE RUSH",
+  },
+  {
+    id: "bram",
+    name: "Bram",
+    skin: "dark",
+    visualStyle: "fantasy",
+    fantasyIndex: 7,
+    subtitle: "Royal Guard",
+    badge: "NEW",
+    description: "Durable armored defender with high guard strength and punishing heavy attacks.",
+    accent: "#778392",
+    attack: 4,
+    defense: 6,
+    speedStat: 2,
+    technique: 3,
+    specialName: "GUARD BREAK",
+  },
+
+  {
+    id: "rei",
+    name: "Rei",
+    skin: "blonde",
+    visualStyle: "fantasy",
+    fantasyIndex: 8,
+    subtitle: "Battle Bard",
+    badge: "NEW",
+    description: "Unpredictable support-style fighter with quick tempo changes and unusual attack rhythm.",
+    accent: "#a47850",
+    attack: 3,
+    defense: 3,
+    speedStat: 4,
+    technique: 5,
+    specialName: "RHYTHM STRIKE",
+  },
+  {
+    id: "raze",
+    name: "Raze",
+    skin: "dark",
+    visualStyle: "fantasy",
+    fantasyIndex: 9,
+    subtitle: "Demon Blade",
+    badge: "NEW",
+    description: "Brutal power fighter with high damage, strong knockback and intimidating pressure.",
+    accent: "#b54a3d",
+    attack: 6,
+    defense: 3,
+    speedStat: 3,
+    technique: 3,
+    specialName: "DEMON CLEAVE",
+  },
+  {
+    id: "kai",
+    name: "Kai",
+    skin: "dark",
+    visualStyle: "fantasy",
+    fantasyIndex: 10,
+    subtitle: "Holy Paladin",
+    badge: "NEW",
+    description: "Stable defensive fighter with strong resilience, counter attacks and disciplined technique.",
+    accent: "#d9b04e",
+    attack: 4,
+    defense: 5,
+    speedStat: 3,
+    technique: 4,
+    specialName: "HOLY IMPACT",
+  },
+  {
+    id: "grim",
+    name: "Grim",
+    skin: "dark",
+    visualStyle: "fantasy",
+    fantasyIndex: 11,
+    subtitle: "Mountain Breaker",
+    badge: "NEW",
+    description: "Short, heavy hammer fighter with huge knockback, strong defense and devastating hits.",
+    accent: "#8b7060",
+    attack: 6,
+    defense: 5,
+    speedStat: 2,
+    technique: 3,
+    specialName: "EARTH SMASH",
+  },
+
   {
     id: "classic-blaze",
     name: "Blaze OG",
     skin: "blonde",
     visualStyle: "classic",
+    fantasyIndex: null,
     subtitle: "Classic Rushdown",
     badge: "CLASSIC",
     description: "The original Blaze appearance with the same fast rushdown fighting behavior.",
@@ -159,12 +381,14 @@ const FIGHTER_ROSTER: Array<{
     defense: 3,
     speedStat: 5,
     technique: 3,
+    specialName: "BLAZE RUSH",
   },
   {
     id: "classic-nyx",
     name: "Nyx OG",
     skin: "dark",
     visualStyle: "classic",
+    fantasyIndex: null,
     subtitle: "Classic Power Guard",
     badge: "CLASSIC",
     description: "The original Nyx appearance with the same defensive kick-focused behavior.",
@@ -173,15 +397,49 @@ const FIGHTER_ROSTER: Array<{
     defense: 5,
     speedStat: 3,
     technique: 4,
+    specialName: "NYX BREAKER",
   },
 ];
 
 const getOpponentChoice = (choice: FighterChoice): FighterChoice => {
-  if (choice === "blaze") return "nyx";
-  if (choice === "nyx") return "blaze";
-  if (choice === "classic-blaze") return "classic-nyx";
-  return "classic-blaze";
+  const index = FIGHTER_ROSTER.findIndex((fighter) => fighter.id === choice);
+  const next = FIGHTER_ROSTER[(index + 1 + FIGHTER_ROSTER.length) % FIGHTER_ROSTER.length];
+  return next.id === choice ? "nyx" : next.id;
 };
+
+const fantasySheetPosition = (index: number) => {
+  const col = index % 4;
+  const row = Math.floor(index / 4);
+  return {
+    x: (col / 3) * 100,
+    y: (row / 2) * 100,
+  };
+};
+
+function drawFantasyFighter(
+  ctx: CanvasRenderingContext2D,
+  sheet: HTMLImageElement,
+  index: number,
+  width: number,
+  height: number
+) {
+  const col = index % 4;
+  const row = Math.floor(index / 4);
+  const cellW = sheet.naturalWidth / 4;
+  const cellH = sheet.naturalHeight / 3;
+
+  ctx.drawImage(
+    sheet,
+    col * cellW,
+    row * cellH,
+    cellW,
+    cellH,
+    -width / 2,
+    -height,
+    width,
+    height
+  );
+}
 
 const FRAME_INDEX = {
   idle: 0,
@@ -390,6 +648,7 @@ export default function FuseRushGame() {
     blonde: null,
     dark: null,
   });
+  const fantasyRosterRef = useRef<HTMLImageElement | null>(null);
   const stageRef = useRef<HTMLImageElement | null>(null);
   const inputRef = useRef({
     keys: new Set<string>(),
@@ -464,6 +723,10 @@ export default function FuseRushGame() {
     nyxAtlas.src = NYX_ATLAS;
     atlasRef.current.dark = nyxAtlas;
 
+    const fantasyRoster = new Image();
+    fantasyRoster.src = FANTASY_ROSTER_URL;
+    fantasyRosterRef.current = fantasyRoster;
+
     const stage = new Image();
     stage.src = "/backgrounds/denuel-stage.svg";
     stageRef.current = stage;
@@ -518,6 +781,7 @@ export default function FuseRushGame() {
         choice: selectedFighter.id,
         skin: selectedFighter.skin,
         visualStyle: selectedFighter.visualStyle,
+        fantasyIndex: selectedFighter.fantasyIndex,
         color: "#8c7cff",
         x: width * 0.28,
         vx: 0,
@@ -552,6 +816,7 @@ export default function FuseRushGame() {
         choice: opponentFighter.id,
         skin: opponentFighter.skin,
         visualStyle: opponentFighter.visualStyle,
+        fantasyIndex: opponentFighter.fantasyIndex,
         color: BOT_COLORS[0],
         x: width * 0.72,
         vx: 0,
@@ -637,7 +902,7 @@ export default function FuseRushGame() {
       enemyRounds: 0,
       roundBanner: "ROUND 1",
       timeLeft: 60,
-      specialName: fighterTuning(selectedFighter.skin).specialName,
+      specialName: selectedFighter.specialName,
       weapon: "PUNCH",
       weaponDurability: 0,
     });
@@ -1610,7 +1875,9 @@ export default function FuseRushGame() {
             timeLeft: g.roundActive
               ? Math.max(0, Math.ceil((g.roundDuration - (t - g.roundStartedAt)) / 1000))
               : 0,
-            specialName: fighterTuning(player.skin).specialName,
+            specialName:
+              FIGHTER_ROSTER.find((entry) => entry.id === player.choice)?.specialName ||
+              fighterTuning(player.skin).specialName,
             weapon: player.weapon ? weaponTuning(player.weapon).name : "PUNCH",
             weaponDurability: player.weaponDurability,
           });
