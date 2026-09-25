@@ -1265,3 +1265,236 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
     font-size:16px;
   }
 }
+
+
+/* Fighter select polish pass */
+.select-card-art {
+  position:relative;
+  overflow:hidden;
+}
+
+.select-atlas-preview {
+  position:absolute;
+  inset:0;
+  transform:scale(1.32) translateY(4%);
+  transform-origin:50% 58%;
+}
+
+.select-atlas-preview.dark {
+  transform:scale(1.46) translateY(5%);
+}
+
+.classic-portrait {
+  position:absolute;
+  inset:0;
+  z-index:2;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  padding:5px 4px 0;
+  filter:drop-shadow(0 8px 8px rgba(0,0,0,.34));
+}
+
+.fighter-detail-art {
+  overflow:hidden;
+}
+
+.detail-atlas-preview {
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  transform:scale(1.34) translateY(5%);
+  transform-origin:50% 62%;
+}
+
+.detail-atlas-preview.dark {
+  transform:scale(1.52) translateY(7%);
+}
+
+.classic-detail-portrait {
+  position:absolute;
+  inset:0;
+  z-index:2;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  padding:8px 4px 0;
+  filter:drop-shadow(0 12px 12px rgba(0,0,0,.42));
+}
+
+.fighter-stat-track i.filled {
+  background:linear-gradient(
+    90deg,
+    color-mix(in srgb,var(--stat-color,#ffd263) 88%,white),
+    var(--stat-color,#ffd263)
+  );
+  box-shadow:0 0 8px color-mix(in srgb,var(--stat-color,#ffd263) 58%,transparent);
+}
+
+.locked-silhouette {
+  position:relative;
+  overflow:hidden;
+}
+
+.locked-silhouette > span {
+  position:relative;
+  z-index:2;
+  font-size:34px;
+  color:rgba(221,229,242,.22);
+}
+
+.locked-silhouette > i {
+  position:absolute;
+  left:50%;
+  bottom:-18px;
+  width:62px;
+  height:100px;
+  transform:translateX(-50%);
+  border-radius:50% 50% 18px 18px;
+  background:
+    radial-gradient(circle at 50% 24%,rgba(117,130,153,.42) 0 18%,transparent 19%),
+    linear-gradient(180deg,rgba(94,109,134,.30),rgba(34,42,58,.88));
+  filter:blur(.2px);
+}
+
+.fighter-select-button {
+  position:sticky;
+  bottom:max(10px,env(safe-area-inset-bottom));
+  z-index:20;
+  width:min(390px,92%);
+  margin:10px auto 0;
+}
+
+.fighter-select-help {
+  padding-bottom:max(8px,env(safe-area-inset-bottom));
+}
+
+@media (max-width:620px) {
+  .fighter-game-logo {
+    margin-bottom:4px;
+  }
+
+  .fighter-game-logo span {
+    font-size:44px;
+  }
+
+  .fighter-game-logo strong {
+    margin-top:5px;
+    font-size:30px;
+  }
+
+  .fighter-select-heading {
+    min-height:44px;
+    margin:5px -2px 8px;
+    font-size:18px;
+  }
+
+  .fighter-select-grid {
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:5px;
+  }
+
+  .select-card-art,
+  .locked-silhouette {
+    height:96px;
+  }
+
+  .select-card-footer {
+    min-height:38px;
+    display:block;
+    text-align:center;
+    padding:5px 3px;
+  }
+
+  .select-card-footer b {
+    display:block;
+    width:100%;
+    font-size:9px;
+    overflow:visible;
+    text-overflow:clip;
+    white-space:nowrap;
+  }
+
+  .select-card-footer small {
+    display:block;
+    margin-top:2px;
+    font-size:6px;
+  }
+
+  .fighter-detail-panel {
+    grid-template-columns:122px 1fr;
+    min-height:146px;
+  }
+
+  .fighter-detail-art {
+    min-height:146px;
+  }
+
+  .fighter-detail-copy {
+    padding:10px 8px 9px 0;
+  }
+
+  .fighter-detail-name strong {
+    font-size:28px;
+  }
+
+  .fighter-detail-copy p {
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+  }
+
+  .fighter-stat-row {
+    margin:4px 0;
+  }
+
+  .fighter-stat-track {
+    max-width:150px;
+  }
+
+  .fighter-select-button {
+    width:92%;
+    margin-top:8px;
+  }
+
+  .fighter-select-help {
+    display:none;
+  }
+}
+
+@media (max-width:390px) {
+  .fighter-select-card-shell {
+    padding:8px;
+  }
+
+  .fighter-select-grid {
+    gap:4px;
+  }
+
+  .select-card-art,
+  .locked-silhouette {
+    height:84px;
+  }
+
+  .select-card-footer b {
+    font-size:8px;
+  }
+
+  .fighter-detail-panel {
+    grid-template-columns:108px 1fr;
+  }
+
+  .fighter-detail-name strong {
+    font-size:24px;
+  }
+
+  .fighter-stat-row {
+    grid-template-columns:52px 1fr;
+  }
+
+  .select-profile-strip span {
+    padding:4px 6px;
+  }
+}
