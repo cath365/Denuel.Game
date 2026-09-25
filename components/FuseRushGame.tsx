@@ -44,7 +44,7 @@ export default function FuseRushGame() {
   const gameRef = useRef<any>(null);
   const rafRef = useRef<number | null>(null);
   const inputRef = useRef({ keys: new Set<string>(), stick: { x: 0, y: 0 }, pointerId: -1, origin: { x: 0, y: 0 } });
-  const imagesRef = useRef<Record<Skin, HTMLImageElement | null>>({ blonde: null, dark: null });
+  const imagesRef = useRef<Record<string, HTMLImageElement>>({});
   const audioRef = useRef<AudioContext | null>(null);
   const [runState, setRunState] = useState<RunState>("menu");
   const [skin, setSkin] = useState<Skin>("blonde");
@@ -62,10 +62,12 @@ export default function FuseRushGame() {
       best: Number(localStorage.getItem("fuserush_best") || 0),
     };
     setProfile(p);
-    (Object.keys(imagesRef.current) as Skin[]).forEach((s) => {
-      const img = new Image();
-      img.src = `/sprites/${s === "blonde" ? "blonde" : "dark"}-idle.webp`;
-      imagesRef.current[s] = img;
+    (["blonde", "dark"] as Skin[]).forEach((character) => {
+      (["idle", "run1", "push"] as const).forEach((state) => {
+        const img = new Image();
+        img.src = `/sprites/${character}-${state}.webp`;
+        imagesRef.current[`${character}-${state}`] = img;
+      });
     });
   }, []);
 
@@ -281,15 +283,17 @@ export default function FuseRushGame() {
         for (const p of g.players as Player[]) {
           if (!p.alive) continue; const carrier = p.id === g.carrierId; if (carrier) { const pulse = 27 + Math.sin(t * 0.015) * 4; ctx.strokeStyle = fuseLeftMs < 1800 ? "#ff315f" : "#ff7d9b"; ctx.lineWidth = 4; ctx.globalAlpha = 0.8; ctx.beginPath(); ctx.arc(p.x, p.y, pulse, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1; ctx.fillStyle = "#ff2e55"; ctx.font = "900 15px system-ui"; ctx.textAlign = "center"; ctx.fillText("💣", p.x, p.y - 43); }
           if (p.shield) { ctx.strokeStyle = "#53dfb0"; ctx.lineWidth = 3; ctx.globalAlpha = 0.72; ctx.beginPath(); ctx.arc(p.x, p.y, 28, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1; }
-          const primary = imagesRef.current[p.skin];
-          const fallback = imagesRef.current.blonde;
-          const primaryReady = !!(primary?.complete && primary.naturalWidth > 0);
-          const img = primaryReady ? primary : fallback;
           const speed = Math.hypot(p.vx, p.vy);
           const moving = speed > 42;
           const dashing = t < p.dashUntil;
           const attacking = t < p.attackUntil;
           const hurt = t < p.stunnedUntil;
+          const runFrame = Math.floor((t + p.id * 79) / 125) % 2 === 0 ? "idle" : "run1";
+          const spriteState = attacking ? "push" : moving ? runFrame : "idle";
+          const primary = imagesRef.current[`${p.skin}-${spriteState}`];
+          const fallback = imagesRef.current[`${p.skin}-idle`] || imagesRef.current["blonde-idle"];
+          const primaryReady = !!(primary?.complete && primary.naturalWidth > 0);
+          const img = primaryReady ? primary : fallback;
           const phase = t * (moving ? 0.022 : 0.007) + p.id * 0.9;
           const bob = hurt ? Math.sin(phase * 2.3) * 2 : moving ? Math.sin(phase) * 4.2 : Math.sin(phase) * 1.4;
           const runKick = moving ? Math.sin(phase) * 0.055 : 0;
@@ -319,7 +323,7 @@ export default function FuseRushGame() {
               ctx.globalAlpha = 0.08 * ghost;
               ctx.translate(p.x - p.faceX * ghost * 14, p.y - p.faceY * ghost * 14 + bob);
               if (fx < 0) ctx.scale(-1, 1);
-              if (!primaryReady && p.skin === "dark") ctx.filter = "grayscale(.75) brightness(.62) saturate(1.3) hue-rotate(150deg)";
+              
               ctx.drawImage(img, -size / 2, -size / 2, size, size);
               ctx.restore();
             }
@@ -354,7 +358,7 @@ export default function FuseRushGame() {
           if (fx < 0) ctx.scale(-1, 1);
           ctx.scale(stretchX, stretchY);
           if (p.human) { ctx.shadowBlur = 18; ctx.shadowColor = "rgba(140,124,255,.9)"; }
-          if (!primaryReady && p.skin === "dark") ctx.filter = "grayscale(.78) brightness(.58) saturate(1.5) hue-rotate(155deg)";
+          
           if (img?.complete && img.naturalWidth > 0) {
             ctx.drawImage(img, -size / 2, -size / 2, size, size);
           } else {
