@@ -1609,32 +1609,8 @@ export default function FuseRushGame() {
         ctx.save();
         ctx.translate(rand(-g.shake, g.shake), rand(-g.shake, g.shake));
 
-        for (const pickup of g.weapons as WeaponPickup[]) {
-          if (!pickup.active) continue;
-
-          const hover = Math.sin(t * 0.006 + pickup.id) * 3;
-          const tune = weaponTuning(pickup.type);
-
-          ctx.save();
-          ctx.translate(pickup.x, g.groundY - 24 + hover);
-          ctx.shadowBlur = 16;
-          ctx.shadowColor = tune.color;
-          ctx.globalAlpha = 0.96;
-          drawWeaponShape(ctx, pickup.type, 0.82, 0);
-          ctx.shadowBlur = 0;
-
-          ctx.fillStyle = "rgba(8,18,35,.78)";
-          ctx.beginPath();
-          ctx.roundRect(-28, 18, 56, 17, 8);
-          ctx.fill();
-
-          ctx.fillStyle = "#ffffff";
-          ctx.font = "900 8px system-ui";
-          ctx.textAlign = "center";
-          ctx.fillText(tune.name, 0, 30);
-          ctx.restore();
-        }
-
+        // Weapon pickups remain active for gameplay but are no longer rendered as
+        // floating tools in the arena. This keeps the fighting stage visually clean.
         for (const fighter of g.fighters as Fighter[]) {
           const knockedOut = !fighter.alive;
           if (knockedOut && t > fighter.koUntil) continue;
