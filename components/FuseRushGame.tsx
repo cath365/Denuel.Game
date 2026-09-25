@@ -408,6 +408,9 @@ export default function FuseRushGame() {
   const [blocking, setBlocking] = useState(false);
   const [specialReady, setSpecialReady] = useState(false);
   const [profile, setProfile] = useState({ coins: 0, xp: 0, best: 0 });
+  const selectedRosterFighter =
+    FIGHTER_ROSTER.find((fighter) => fighter.id === fighterChoice) ??
+    FIGHTER_ROSTER[0];
   const [hud, setHud] = useState<Hud>({
     hp: 100,
     enemies: [{ name: "Rex", hp: 100, alive: true }],
@@ -502,13 +505,18 @@ export default function FuseRushGame() {
     const selectedFighter =
       FIGHTER_ROSTER.find((fighter) => fighter.id === fighterChoice) ??
       FIGHTER_ROSTER[0];
+    const opponentChoice = getOpponentChoice(selectedFighter.id);
+    const opponentFighter =
+      FIGHTER_ROSTER.find((fighter) => fighter.id === opponentChoice) ??
+      FIGHTER_ROSTER[1];
 
     const fighters: Fighter[] = [
       {
         id: 0,
-        name: "YOU",
+        name: selectedFighter.name,
         human: true,
-        skin,
+        choice: selectedFighter.id,
+        skin: selectedFighter.skin,
         visualStyle: selectedFighter.visualStyle,
         color: "#8c7cff",
         x: width * 0.28,
@@ -539,10 +547,11 @@ export default function FuseRushGame() {
       },
       {
         id: 1,
-        name: "Rex",
+        name: opponentFighter.name,
         human: false,
-        skin: skin === "blonde" ? "dark" : "blonde",
-        visualStyle: "phase1",
+        choice: opponentFighter.id,
+        skin: opponentFighter.skin,
+        visualStyle: opponentFighter.visualStyle,
         color: BOT_COLORS[0],
         x: width * 0.72,
         vx: 0,
@@ -628,7 +637,7 @@ export default function FuseRushGame() {
       enemyRounds: 0,
       roundBanner: "ROUND 1",
       timeLeft: 60,
-      specialName: fighterTuning(skin).specialName,
+      specialName: fighterTuning(selectedFighter.skin).specialName,
       weapon: "PUNCH",
       weaponDurability: 0,
     });
