@@ -2191,7 +2191,7 @@ export default function FuseRushGame() {
           {hud.roundBanner && <div className="round-banner">{hud.roundBanner}</div>}
 
           <div className="fight-callout">
-            {selectedRosterFighter.name} • {fighterTuning(selectedRosterFighter.skin).style}
+            {selectedRosterFighter.name} • {selectedRosterFighter.subtitle}
           </div>
 
           <div className="combat-meter">
@@ -2267,7 +2267,7 @@ export default function FuseRushGame() {
                 special();
               }}
             >
-              {hud.specialName === "BLAZE RUSH" ? "RUSH" : "BREAKER"}
+              SPECIAL
             </button>
 
             <button
@@ -2314,11 +2314,22 @@ export default function FuseRushGame() {
                     }}
                   >
                     <span className="select-card-art">
-                      <span
-                        className={`select-atlas-preview ${fighter.skin}`}
-                        style={{ backgroundImage: `url(${atlasSource})` }}
-                        aria-hidden="true"
-                      />
+                      {fighter.visualStyle === "fantasy" && fighter.fantasyIndex !== null ? (
+                        <span
+                          className="fantasy-roster-preview"
+                          style={{
+                            backgroundImage: `url(${FANTASY_ROSTER_URL})`,
+                            backgroundPosition: `${fantasySheetPosition(fighter.fantasyIndex).x}% ${fantasySheetPosition(fighter.fantasyIndex).y}%`,
+                          }}
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <span
+                          className={`select-atlas-preview ${fighter.skin}`}
+                          style={{ backgroundImage: `url(${atlasSource})` }}
+                          aria-hidden="true"
+                        />
+                      )}
 
                       {fighter.visualStyle === "classic" && (
                         <img
@@ -2340,28 +2351,7 @@ export default function FuseRushGame() {
                 );
               })}
 
-              {[
-                ["Sahin", "◈"],
-                ["Leon", "✦"],
-                ["Vex", "◆"],
-                ["Hana", "✧"],
-              ].map(([name, icon]) => (
-                <button
-                  key={name}
-                  className="select-fighter-card locked"
-                  disabled
-                  aria-label={`${name} coming soon`}
-                >
-                  <span className="locked-silhouette">
-                    <span>{icon}</span>
-                    <i />
-                  </span>
-                  <span className="select-card-footer">
-                    <b>{name}</b>
-                    <small>LOCKED</small>
-                  </span>
-                </button>
-              ))}
+
             </div>
 
             <div
@@ -2369,17 +2359,29 @@ export default function FuseRushGame() {
               style={{ "--fighter-accent": selectedRosterFighter.accent } as React.CSSProperties}
             >
               <div className="fighter-detail-art">
-                <span
-                  className={`detail-atlas-preview ${selectedRosterFighter.skin}`}
-                  style={{
-                    backgroundImage: `url(${
-                      selectedRosterFighter.skin === "blonde"
-                        ? BLAZE_ATLAS
-                        : NYX_ATLAS
-                    })`,
-                  }}
-                  aria-hidden="true"
-                />
+                {selectedRosterFighter.visualStyle === "fantasy" &&
+                selectedRosterFighter.fantasyIndex !== null ? (
+                  <span
+                    className="fantasy-detail-preview"
+                    style={{
+                      backgroundImage: `url(${FANTASY_ROSTER_URL})`,
+                      backgroundPosition: `${fantasySheetPosition(selectedRosterFighter.fantasyIndex).x}% ${fantasySheetPosition(selectedRosterFighter.fantasyIndex).y}%`,
+                    }}
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <span
+                    className={`detail-atlas-preview ${selectedRosterFighter.skin}`}
+                    style={{
+                      backgroundImage: `url(${
+                        selectedRosterFighter.skin === "blonde"
+                          ? BLAZE_ATLAS
+                          : NYX_ATLAS
+                      })`,
+                    }}
+                    aria-hidden="true"
+                  />
+                )}
 
                 {selectedRosterFighter.visualStyle === "classic" && (
                   <img
@@ -2426,7 +2428,7 @@ export default function FuseRushGame() {
 
                 <div className="fighter-style-line">
                   {selectedRosterFighter.subtitle} •{" "}
-                  {fighterTuning(selectedRosterFighter.skin).specialName}
+                  {selectedRosterFighter.specialName}
                 </div>
               </div>
             </div>
