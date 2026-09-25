@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BLAZE_ATLAS, NYX_ATLAS } from "./sprite-data/atlases";
 
 type Skin = "blonde" | "dark";
+type VisualStyle = "phase1" | "classic";
+type FighterChoice = "blaze" | "nyx" | "classic-blaze" | "classic-nyx";
 type RunState = "menu" | "playing" | "result";
 type AttackType = "punch" | "kick" | null;
 type WeaponType = "bat" | "hammer" | "blade" | null;
@@ -20,6 +22,7 @@ type Fighter = {
   name: string;
   human: boolean;
   skin: Skin;
+  visualStyle: VisualStyle;
   color: string;
   x: number;
   vx: number;
@@ -99,6 +102,48 @@ type Result = {
 
 const BOT_NAMES = ["Nova", "Rex"];
 const BOT_COLORS = ["#ff5c86", "#53dfb0"];
+
+const FIGHTER_ROSTER: Array<{
+  id: FighterChoice;
+  name: string;
+  skin: Skin;
+  visualStyle: VisualStyle;
+  subtitle: string;
+  badge: string;
+}> = [
+  {
+    id: "blaze",
+    name: "Blaze",
+    skin: "blonde",
+    visualStyle: "phase1",
+    subtitle: "Rushdown • full combat animation",
+    badge: "NEW",
+  },
+  {
+    id: "nyx",
+    name: "Nyx",
+    skin: "dark",
+    visualStyle: "phase1",
+    subtitle: "Power Guard • full combat animation",
+    badge: "NEW",
+  },
+  {
+    id: "classic-blaze",
+    name: "Classic Blaze",
+    skin: "blonde",
+    visualStyle: "classic",
+    subtitle: "Original game fighter",
+    badge: "CLASSIC",
+  },
+  {
+    id: "classic-nyx",
+    name: "Classic Nyx",
+    skin: "dark",
+    visualStyle: "classic",
+    subtitle: "Original game fighter",
+    badge: "CLASSIC",
+  },
+];
 
 const FRAME_INDEX = {
   idle: 0,
@@ -316,6 +361,7 @@ export default function FuseRushGame() {
   });
 
   const [runState, setRunState] = useState<RunState>("menu");
+  const [fighterChoice, setFighterChoice] = useState<FighterChoice>("blaze");
   const [skin, setSkin] = useState<Skin>("blonde");
   const [stickVisual, setStickVisual] = useState(0);
   const [punchReady, setPunchReady] = useState(true);
@@ -418,6 +464,9 @@ export default function FuseRushGame() {
     const rect = canvas.getBoundingClientRect();
     const width = rect.width || window.innerWidth;
     const now = performance.now();
+    const selectedFighter =
+      FIGHTER_ROSTER.find((fighter) => fighter.id === fighterChoice) ??
+      FIGHTER_ROSTER[0];
 
     const fighters: Fighter[] = [
       {
@@ -425,6 +474,7 @@ export default function FuseRushGame() {
         name: "YOU",
         human: true,
         skin,
+        visualStyle: selectedFighter.visualStyle,
         color: "#8c7cff",
         x: width * 0.24,
         vx: 0,
@@ -457,6 +507,7 @@ export default function FuseRushGame() {
         name: BOT_NAMES[0],
         human: false,
         skin: skin === "blonde" ? "dark" : "blonde",
+        visualStyle: "phase1",
         color: BOT_COLORS[0],
         x: width * 0.57,
         vx: 0,
@@ -489,6 +540,7 @@ export default function FuseRushGame() {
         name: BOT_NAMES[1],
         human: false,
         skin,
+        visualStyle: "phase1",
         color: BOT_COLORS[1],
         x: width * 0.80,
         vx: 0,
@@ -586,7 +638,7 @@ export default function FuseRushGame() {
     setSpecialReady(false);
     setRunState("playing");
     beep(520, 0.05, 0.04, "square");
-  }, [beep, skin]);
+  }, [beep, fighterChoice, skin]);
 
   const hitTarget = useCallback(
     (
@@ -1645,7 +1697,9 @@ export default function FuseRushGame() {
           }
 
           const atlas = atlasRef.current[fighter.skin];
-          const atlasReady = !!(
+          const atlasReady =
+            fighter.visualStyle === "phase1" &&
+            !!(
             atlas?.complete &&
             atlas.naturalWidth >= ATLAS_CELL_W &&
             atlas.naturalHeight >= ATLAS_CELL_H
@@ -1983,30 +2037,61 @@ export default function FuseRushGame() {
             </div>
 
             <p className="tagline">
-              Choose your fighter, enter the stage, and defeat both opponents with punches,
-              kicks, blocking, combos and a charged special attack.
+              Choose from the new fully animated fighters or the original classic fighters, then enter the stage and fight with punches, kicks, blocks, combos and weapons.
             </p>
 
             <div className="character-title">CHOOSE YOUR FIGHTER</div>
 
-            <div className="character-picker">
-              <button
-                className={`character ${skin === "blonde" ? "selected" : ""}`}
-                onClick={() => setSkin("blonde")}
-              >
-                <img src="/sprites/blonde-idle.webp" alt="Blaze" />
-                <b>Blaze</b>
-                <small>Rushdown • fast punches • Blaze Rush</small>
-              </button>
+            <div className="fighter-roster">
+              {FIGHTER_ROSTER.map((fighter) => {
+                const selected = fighterChoice === fighter.id;
+                const isPhaseOne = fighter.visualStyle === "phase1";
+                const atlasSource =
+                  fighter.skin === "blonde" ? BLAZE_ATLAS : NYX_ATLAS;
 
-              <button
-                className={`character ${skin === "dark" ? "selected" : ""}`}
-                onClick={() => setSkin("dark")}
-              >
-                <img src="/sprites/dark-idle.webp" alt="Nyx" />
-                <b>Nyx</b>
-                <small>Power Guard • heavy kicks • Nyx Breaker</small>
-              </button>
+                return (
+                  <button
+                    key={fighter.id}
+                    className={`fighter-card ${selected ? "selected" : ""} ${isPhaseOne ? "phase1" : "classic"}`}
+                    onClick={() => {
+                      setFighterChoice(fighter.id);
+                      setSkin(fighter.skin);
+                    }}
+                  >
+                    <span className={`fighter-badge ${isPhaseOne ? "new" : "old"}`}>
+                      {fighter.badge}
+                    </span>
+
+                    {isPhaseOne ? (
+                      <span
+                        className="fighter-atlas-preview"
+                        style={{
+                          backgroundImage: `url(${atlasSource})`,
+                        }}
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <img
+                        src={`/sprites/${fighter.skin}-idle.webp`}
+                        alt={fighter.name}
+                      />
+                    )}
+
+                    <b>{fighter.name}</b>
+                    <small>{fighter.subtitle}</small>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="selected-fighter-info">
+              <strong>
+                {(FIGHTER_ROSTER.find((fighter) => fighter.id === fighterChoice) ??
+                  FIGHTER_ROSTER[0]).name}
+              </strong>
+              <span>
+                {fighterTuning(skin).style} • {fighterTuning(skin).specialName}
+              </span>
             </div>
 
             <div className="stats">
