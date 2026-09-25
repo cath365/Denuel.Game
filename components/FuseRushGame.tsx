@@ -1352,6 +1352,50 @@ export default function FuseRushGame() {
           fighter.x = clamp(fighter.x, g.leftBound, g.rightBound);
         }
 
+        for (const pickup of g.weapons as WeaponPickup[]) {
+          if (!pickup.active && pickup.respawnAt > 0 && t >= pickup.respawnAt) {
+            pickup.active = true;
+            pickup.respawnAt = 0;
+            pickup.x = rand(g.leftBound + 70, g.rightBound - 70);
+          }
+        }
+
+        if (g.roundActive) {
+          for (const fighter of g.fighters as Fighter[]) {
+            if (!fighter.alive || fighter.weapon) continue;
+
+            for (const pickup of g.weapons as WeaponPickup[]) {
+              if (!pickup.active) continue;
+
+              if (Math.abs(fighter.x - pickup.x) < 34) {
+                const tune = weaponTuning(pickup.type);
+                fighter.weapon = pickup.type;
+                fighter.weaponDurability = tune.durability;
+                pickup.active = false;
+                pickup.respawnAt = t + rand(9000, 12500);
+
+                g.floaters.push({
+                  x: fighter.x,
+                  y: g.groundY - 122,
+                  text: `${tune.name} PICKED UP`,
+                  life: 1,
+                  color: tune.color,
+                  size: 13,
+                });
+
+                burst(g, fighter.x, g.groundY - 48, tune.color, 9, 130);
+
+                if (fighter.human) {
+                  beep(520, 0.045, 0.035, "square");
+                  vibrate(12);
+                }
+
+                break;
+              }
+            }
+          }
+        }
+
         for (let i = 0; i < g.fighters.length; i++) {
           for (let j = i + 1; j < g.fighters.length; j++) {
             const a: Fighter = g.fighters[i];
@@ -1417,12 +1461,40 @@ export default function FuseRushGame() {
               ? Math.max(0, Math.ceil((g.roundDuration - (t - g.roundStartedAt)) / 1000))
               : 0,
             specialName: fighterTuning(player.skin).specialName,
+            weapon: player.weapon ? weaponTuning(player.weapon).name : "PUNCH",
+            weaponDurability: player.weaponDurability,
           });
           setSpecialReady(g.roundActive && player.energy >= 100);
         }
 
         ctx.save();
         ctx.translate(rand(-g.shake, g.shake), rand(-g.shake, g.shake));
+
+        for (const pickup of g.weapons as WeaponPickup[]) {
+          if (!pickup.active) continue;
+
+          const hover = Math.sin(t * 0.006 + pickup.id) * 3;
+          const tune = weaponTuning(pickup.type);
+
+          ctx.save();
+          ctx.translate(pickup.x, g.groundY - 24 + hover);
+          ctx.shadowBlur = 16;
+          ctx.shadowColor = tune.color;
+          ctx.globalAlpha = 0.96;
+          drawWeaponShape(ctx, pickup.type, 0.82, 0);
+          ctx.shadowBlur = 0;
+
+          ctx.fillStyle = "rgba(8,18,35,.78)";
+          ctx.beginPath();
+          ctx.roundRect(-28, 18, 56, 17, 8);
+          ctx.fill();
+
+          ctx.fillStyle = "#ffffff";
+          ctx.font = "900 8px system-ui";
+          ctx.textAlign = "center";
+          ctx.fillText(tune.name, 0, 30);
+          ctx.restore();
+        }
 
         for (const fighter of g.fighters as Fighter[]) {
           const knockedOut = !fighter.alive;
@@ -1438,7 +1510,7 @@ export default function FuseRushGame() {
             Math.floor((t + fighter.id * 89) / 110) % 2 === 0 ? "run1" : "run2";
 
           let spriteState = moving ? runFrame : "idle";
-          if (fighter.attackType === "punch" && attacking) {
+          if (fighter.attackType === "punch" && attacking && !fighter.weapon) {
             const p = attackProgressSafe(t, fighter, 250);
             spriteState = p < 0.16 ? "idle" : p < 0.76 ? "push" : "idle";
           }
@@ -1448,9 +1520,15 @@ export default function FuseRushGame() {
           }
           if (guarding) spriteState = "idle";
 
+          const preferredImg = imagesRef.current[`${fighter.skin}-${spriteState}`];
+          const idleImg = imagesRef.current[`${fighter.skin}-idle`];
+          const fallbackImg = imagesRef.current["blonde-idle"];
           const img =
-            imagesRef.current[`${fighter.skin}-${spriteState}`] ||
-            imagesRef.current[`${fighter.skin}-idle`];
+            preferredImg?.complete && preferredImg.naturalWidth > 0
+              ? preferredImg
+              : idleImg?.complete && idleImg.naturalWidth > 0
+                ? idleImg
+                : fallbackImg;
 
           const size = fighter.human ? 104 : 98;
           const feetY = g.groundY;
@@ -1474,7 +1552,15 @@ export default function FuseRushGame() {
           let attackProgress = 0;
 
           if (attacking) {
-            const duration = fighter.attackType === "punch" ? 250 : 390;
+            const punchDuration =
+              fighter.weapon === "hammer"
+                ? 340
+                : fighter.weapon === "bat"
+                  ? 285
+                  : fighter.weapon === "blade"
+                    ? 245
+                    : 250;
+            const duration = fighter.attackType === "punch" ? punchDuration : 390;
             attackProgress = clamp((t - fighter.attackStartedAt) / duration, 0, 1);
           }
 
@@ -1552,18 +1638,35 @@ export default function FuseRushGame() {
             ctx.stroke();
           }
 
+          if (fighter.weapon && !knockedOut) {
+            ctx.save();
+            ctx.translate(14, -58);
+            drawWeaponShape(
+              ctx,
+              fighter.weapon,
+              fighter.human ? 0.88 : 0.82,
+              fighter.attackType === "punch" && attacking ? strikeCurve : 0
+            );
+            ctx.restore();
+          }
+
           ctx.restore();
 
           if (attacking) {
+            const activeWeapon =
+              fighter.attackType === "punch" && fighter.weapon
+                ? weaponTuning(fighter.weapon)
+                : null;
             const reach =
               fighter.attackType === "punch"
-                ? 48 + strikeCurve * 24
+                ? 48 + strikeCurve * 24 + (activeWeapon?.rangeBonus || 0) * 0.55
                 : 58 + strikeCurve * 45;
 
             ctx.save();
             ctx.globalAlpha = 0.28 + strikeCurve * 0.5;
             ctx.strokeStyle =
-              fighter.attackType === "punch" ? "#fff0a4" : "#ffb05a";
+              activeWeapon?.color ||
+              (fighter.attackType === "punch" ? "#fff0a4" : "#ffb05a");
             ctx.lineWidth = fighter.attackType === "punch" ? 5 : 7;
             ctx.beginPath();
             ctx.arc(
@@ -1732,6 +1835,11 @@ export default function FuseRushGame() {
               <i style={{ width: `${hud.energy}%` }} />
             </div>
             {hud.combo > 1 && <div className="combo-badge">COMBO x{hud.combo}</div>}
+            <div className={`weapon-status ${hud.weapon !== "PUNCH" ? "armed" : ""}`}>
+              {hud.weapon === "PUNCH"
+                ? "UNARMED"
+                : `${hud.weapon} • ${hud.weaponDurability} HITS`}
+            </div>
           </div>
 
           <div className="joystick-base horizontal-stick">
@@ -1749,7 +1857,7 @@ export default function FuseRushGame() {
                 punch();
               }}
             >
-              PUNCH
+              {hud.weapon === "PUNCH" ? "PUNCH" : hud.weapon === "ENERGY BLADE" ? "BLADE" : hud.weapon}
             </button>
 
             <button
@@ -1861,7 +1969,7 @@ export default function FuseRushGame() {
             </button>
 
             <div className="help">
-              Mobile: move left/right • PUNCH • KICK • hold BLOCK • SPECIAL at 100% • DASH. Desktop: A/D or arrows • J/F punch • K/E kick • L block • U/Q special • Space/Shift dash.
+              Mobile: move left/right • walk over weapons to pick them up • PUNCH becomes the weapon attack • KICK • hold BLOCK • SPECIAL at 100% • DASH. Desktop: A/D or arrows • J/F attack • K/E kick • L block • U/Q special • Space/Shift dash.
             </div>
           </div>
         </section>
