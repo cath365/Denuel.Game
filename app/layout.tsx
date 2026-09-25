@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "FuseRush.io — Bomb Tag Arena",
-  description: "Fast browser bomb-tag survival game built for Vercel."
+  title: "Denuel Fight — 3 Fighter Arena",
+  description: "Fast three-fighter browser arena game built for Vercel."
 };
 
 export const viewport: Viewport = {
