@@ -898,9 +898,87 @@ export default function FuseRushGame() {
         coins,
         xp,
         time,
+        playerRounds: g.playerRounds,
+        enemyRounds: g.enemyRounds,
       });
 
       setTimeout(() => setRunState("result"), 450);
+    };
+
+    const resetRound = (g: any, now: number) => {
+      const positions = [g.width * 0.24, g.width * 0.57, g.width * 0.80];
+
+      (g.fighters as Fighter[]).forEach((fighter, index) => {
+        fighter.x = positions[index];
+        fighter.vx = 0;
+        fighter.hp = fighter.maxHp;
+        fighter.alive = true;
+        fighter.facing = index === 0 ? 1 : -1;
+        fighter.attackType = null;
+        fighter.attackStartedAt = 0;
+        fighter.attackUntil = 0;
+        fighter.punchCooldownUntil = 0;
+        fighter.kickCooldownUntil = 0;
+        fighter.dashUntil = 0;
+        fighter.dashCooldownUntil = 0;
+        fighter.stunUntil = 0;
+        fighter.invulnUntil = 0;
+        fighter.blocking = false;
+        fighter.blockUntil = 0;
+        fighter.energy = 0;
+        fighter.comboCount = 0;
+        fighter.comboUntil = 0;
+        fighter.koUntil = 0;
+        fighter.targetId = fighter.human ? 1 : 0;
+        fighter.thinkAt = 0;
+      });
+
+      g.roundStartedAt = now;
+      g.roundActive = true;
+      g.nextRoundAt = 0;
+      g.comboSequence = [];
+      g.comboWindowUntil = 0;
+      g.roundBanner = g.round >= 3 ? "FINAL ROUND" : `ROUND ${g.round}`;
+      g.roundBannerUntil = now + 1250;
+      g.particles = [];
+      g.floaters = [];
+
+      setPunchReady(true);
+      setKickReady(true);
+      setDashReady(true);
+      setBlocking(false);
+      setSpecialReady(false);
+      beep(g.round >= 3 ? 330 : 440, 0.09, 0.045, "square");
+    };
+
+    const endRound = (g: any, playerWon: boolean, now: number) => {
+      if (!g.roundActive || g.ending) return;
+
+      g.roundActive = false;
+      const player: Fighter = g.fighters[0];
+      player.blocking = false;
+      setBlocking(false);
+
+      if (playerWon) {
+        g.playerRounds += 1;
+        g.score += 500;
+        g.roundBanner = "ROUND WON";
+        beep(660, 0.12, 0.055, "square");
+      } else {
+        g.enemyRounds += 1;
+        g.roundBanner = "ROUND LOST";
+        beep(105, 0.16, 0.055, "sawtooth");
+      }
+
+      g.roundBannerUntil = now + 1500;
+
+      if (g.playerRounds >= 2 || g.enemyRounds >= 2) {
+        g.matchWinner = g.playerRounds >= 2;
+        g.matchFinishAt = now + 1650;
+      } else {
+        g.round += 1;
+        g.nextRoundAt = now + 1750;
+      }
     };
 
     const updateBot = (g: any, bot: Fighter, now: number, dt: number) => {
@@ -1020,10 +1098,28 @@ export default function FuseRushGame() {
         const player: Fighter = g.fighters[0];
         const alive = (g.fighters as Fighter[]).filter((f) => f.alive);
 
-        if (!player.alive) finish(g, false, t);
-        else if (alive.length === 1 && alive[0].human) finish(g, true, t);
+        if (g.matchFinishAt && t >= g.matchFinishAt) {
+          finish(g, g.matchWinner, t);
+        } else if (!g.roundActive && g.nextRoundAt && t >= g.nextRoundAt) {
+          resetRound(g, t);
+        }
 
-        if (player.alive && !player.blocking && t >= player.stunUntil) {
+        if (g.roundActive) {
+          if (!player.alive) {
+            endRound(g, false, t);
+          } else if (alive.length === 1 && alive[0].human) {
+            endRound(g, true, t);
+          } else if (t - g.roundStartedAt >= g.roundDuration) {
+            const playerPct = player.hp / player.maxHp;
+            const enemies = (g.fighters as Fighter[]).filter((f) => !f.human);
+            const enemyPct =
+              enemies.reduce((sum, fighter) => sum + fighter.hp / fighter.maxHp, 0) /
+              Math.max(1, enemies.length);
+            endRound(g, playerPct >= enemyPct, t);
+          }
+        }
+
+        if (g.roundActive && player.alive && !player.blocking && t >= player.stunUntil) {
           let dir = inputRef.current.stickX;
 
           if (inputRef.current.keys.has("a") || inputRef.current.keys.has("arrowleft")) {
@@ -1042,13 +1138,13 @@ export default function FuseRushGame() {
         }
 
         for (const fighter of g.fighters as Fighter[]) {
-          if (!fighter.human) updateBot(g, fighter, t, dt);
+          if (!fighter.human && g.roundActive) updateBot(g, fighter, t, dt);
         }
 
         for (const fighter of g.fighters as Fighter[]) {
           if (!fighter.alive) continue;
 
-          const drag = Math.pow(0.0012, dt);
+          const drag = Math.pow(g.roundActive ? 0.0012 : 0.00001, dt);
           fighter.vx *= drag;
 
           const tune = fighterTuning(fighter.skin);
@@ -1117,8 +1213,16 @@ export default function FuseRushGame() {
             time: Math.floor((t - g.start) / 1000),
             energy: player.energy,
             combo: t <= player.comboUntil ? player.comboCount : 0,
+            round: g.round,
+            playerRounds: g.playerRounds,
+            enemyRounds: g.enemyRounds,
+            roundBanner: t <= g.roundBannerUntil ? g.roundBanner : "",
+            timeLeft: g.roundActive
+              ? Math.max(0, Math.ceil((g.roundDuration - (t - g.roundStartedAt)) / 1000))
+              : 0,
+            specialName: fighterTuning(player.skin).specialName,
           });
-          setSpecialReady(player.energy >= 100);
+          setSpecialReady(g.roundActive && player.energy >= 100);
         }
 
         ctx.save();
@@ -1411,7 +1515,17 @@ export default function FuseRushGame() {
             ))}
           </div>
 
-          <div className="fight-callout">LAST FIGHTER STANDING</div>
+          <div className="round-scoreboard">
+            <span className="round-side">YOU <b>{hud.playerRounds}</b></span>
+            <span className="round-center">ROUND {hud.round} • {hud.timeLeft}s</span>
+            <span className="round-side"><b>{hud.enemyRounds}</b> RIVALS</span>
+          </div>
+
+          {hud.roundBanner && <div className="round-banner">{hud.roundBanner}</div>}
+
+          <div className="fight-callout">
+            {fighterTuning(skin).name} • {fighterTuning(skin).style}
+          </div>
 
           <div className="combat-meter">
             <div className="meter-row">
@@ -1481,7 +1595,7 @@ export default function FuseRushGame() {
                 special();
               }}
             >
-              SPECIAL
+              {hud.specialName === "BLAZE RUSH" ? "RUSH" : "BREAKER"}
             </button>
 
             <button
@@ -1564,8 +1678,8 @@ export default function FuseRushGame() {
 
             <p className="tagline">
               {result.won
-                ? "You defeated both opponents."
-                : "You were knocked out. Change fighter or try again."}
+                ? "You won the best-of-3 match."
+                : "The rivals won the match. Change fighter or try again."}
             </p>
 
             <div className="stats">
@@ -1581,6 +1695,10 @@ export default function FuseRushGame() {
                 <b>{result.time}s</b>
                 <small>Fight Time</small>
               </div>
+            </div>
+
+            <div className="match-score-result">
+              MATCH SCORE: {result.playerRounds} - {result.enemyRounds}
             </div>
 
             <div className="reward">
