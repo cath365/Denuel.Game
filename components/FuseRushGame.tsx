@@ -100,8 +100,8 @@ type Result = {
   enemyRounds: number;
 };
 
-const BOT_NAMES = ["Nova", "Rex"];
-const BOT_COLORS = ["#ff5c86", "#53dfb0"];
+const BOT_NAMES = ["Rex"];
+const BOT_COLORS = ["#ff5c86"];
 
 const FIGHTER_ROSTER: Array<{
   id: FighterChoice;
@@ -372,10 +372,7 @@ export default function FuseRushGame() {
   const [profile, setProfile] = useState({ coins: 0, xp: 0, best: 0 });
   const [hud, setHud] = useState<Hud>({
     hp: 100,
-    enemies: [
-      { name: "Nova", hp: 100, alive: true },
-      { name: "Rex", hp: 100, alive: true },
-    ],
+    enemies: [{ name: "Rex", hp: 100, alive: true }],
     score: 0,
     kos: 0,
     time: 0,
@@ -476,7 +473,7 @@ export default function FuseRushGame() {
         skin,
         visualStyle: selectedFighter.visualStyle,
         color: "#8c7cff",
-        x: width * 0.24,
+        x: width * 0.28,
         vx: 0,
         hp: 100,
         maxHp: 100,
@@ -504,45 +501,12 @@ export default function FuseRushGame() {
       },
       {
         id: 1,
-        name: BOT_NAMES[0],
+        name: "Rex",
         human: false,
         skin: skin === "blonde" ? "dark" : "blonde",
         visualStyle: "phase1",
         color: BOT_COLORS[0],
-        x: width * 0.57,
-        vx: 0,
-        hp: 100,
-        maxHp: 100,
-        alive: true,
-        facing: -1,
-        attackType: null,
-        attackStartedAt: 0,
-        attackUntil: 0,
-        punchCooldownUntil: 0,
-        kickCooldownUntil: 0,
-        dashUntil: 0,
-        dashCooldownUntil: 0,
-        stunUntil: 0,
-        invulnUntil: 0,
-        thinkAt: 0,
-        targetId: 0,
-        blocking: false,
-        blockUntil: 0,
-        energy: 0,
-        comboCount: 0,
-        comboUntil: 0,
-        koUntil: 0,
-        weapon: null,
-        weaponDurability: 0,
-      },
-      {
-        id: 2,
-        name: BOT_NAMES[1],
-        human: false,
-        skin,
-        visualStyle: "phase1",
-        color: BOT_COLORS[1],
-        x: width * 0.80,
+        x: width * 0.72,
         vx: 0,
         hp: 100,
         maxHp: 100,
@@ -1214,7 +1178,7 @@ export default function FuseRushGame() {
     };
 
     const resetRound = (g: any, now: number) => {
-      const positions = [g.width * 0.24, g.width * 0.57, g.width * 0.80];
+      const positions = [g.width * 0.28, g.width * 0.72];
 
       (g.fighters as Fighter[]).forEach((fighter, index) => {
         fighter.x = positions[index];
@@ -1907,7 +1871,7 @@ export default function FuseRushGame() {
           <div className="round-scoreboard">
             <span className="round-side">YOU <b>{hud.playerRounds}</b></span>
             <span className="round-center">ROUND {hud.round} • {hud.timeLeft}s</span>
-            <span className="round-side"><b>{hud.enemyRounds}</b> RIVALS</span>
+            <span className="round-side"><b>{hud.enemyRounds}</b> OPPONENT</span>
           </div>
 
           {hud.roundBanner && <div className="round-banner">{hud.roundBanner}</div>}
@@ -2104,7 +2068,7 @@ export default function FuseRushGame() {
             <p className="tagline">
               {result.won
                 ? "You won the best-of-3 match."
-                : "The rivals won the match. Change fighter or try again."}
+                : "Your opponent won the match. Change fighter or try again."}
             </p>
 
             <div className="stats">
