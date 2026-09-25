@@ -535,7 +535,9 @@ export default function FuseRushGame() {
       const forward = dx * attacker.facing;
       const absDx = Math.abs(dx);
 
-      const range = type === "punch" ? 78 : 112;
+      const activeWeapon =
+        type === "punch" && attacker.weapon ? weaponTuning(attacker.weapon) : null;
+      const range = type === "punch" ? 78 + (activeWeapon?.rangeBonus || 0) : 112;
       if (forward < 4 || absDx > range) return false;
 
       const attackerTune = fighterTuning(attacker.skin);
@@ -557,10 +559,18 @@ export default function FuseRushGame() {
         )
       );
 
+      if (activeWeapon) {
+        damage += activeWeapon.damageBonus;
+      }
+
       let knockback =
         type === "punch"
           ? 240 * (attacker.skin === "blonde" ? 1.08 : 1)
           : 410 * (attacker.skin === "dark" ? 1.12 : 1);
+
+      if (activeWeapon) {
+        knockback += activeWeapon.knockbackBonus;
+      }
 
       const isBlocking = target.blocking || now < target.blockUntil;
 
@@ -623,6 +633,25 @@ export default function FuseRushGame() {
         g.score += damage * (type === "punch" ? 8 : 11) + attacker.comboCount * 12;
       }
 
+      if (activeWeapon && attacker.weapon) {
+        attacker.weaponDurability = Math.max(0, attacker.weaponDurability - 1);
+
+        if (attacker.weaponDurability <= 0) {
+          const brokenName = activeWeapon.name;
+          attacker.weapon = null;
+          attacker.weaponDurability = 0;
+          g.floaters.push({
+            x: attacker.x,
+            y: g.groundY - 125,
+            text: `${brokenName} BROKE!`,
+            life: 1,
+            color: "#ffffff",
+            size: 14,
+          });
+          burst(g, attacker.x + attacker.facing * 30, g.groundY - 58, activeWeapon.color, 10, 150);
+        }
+      }
+
       const hitY = g.groundY - 66;
       burst(
         g,
@@ -636,7 +665,7 @@ export default function FuseRushGame() {
       g.floaters.push({
         x: target.x,
         y: hitY - 24,
-        text: `${type === "punch" ? "PUNCH" : "KICK"} -${damage}`,
+        text: `${activeWeapon ? activeWeapon.name : type === "punch" ? "PUNCH" : "KICK"} -${damage}`,
         life: 0.9,
         color: type === "punch" ? "#fff3b5" : "#ffd08a",
         size: type === "punch" ? 14 : 16,
@@ -648,6 +677,18 @@ export default function FuseRushGame() {
         target.alive = false;
         target.koUntil = now + 850;
         target.vx = attacker.facing * 220;
+
+        if (target.weapon) {
+          g.weapons.push({
+            id: g.weaponId++,
+            type: target.weapon,
+            x: clamp(target.x, g.leftBound + 35, g.rightBound - 35),
+            active: true,
+            respawnAt: 0,
+          });
+          target.weapon = null;
+          target.weaponDurability = 0;
+        }
         burst(g, target.x, hitY, "#ff5c86", 28, 300);
         g.floaters.push({
           x: target.x,
@@ -680,9 +721,22 @@ export default function FuseRushGame() {
       if (type === "punch") {
         if (now < fighter.punchCooldownUntil) return false;
         const tune = fighterTuning(fighter.skin);
+        const weaponTune = fighter.weapon ? weaponTuning(fighter.weapon) : null;
         fighter.punchCooldownUntil =
-          now + (fighter.human ? 380 * tune.punchCooldown : rand(460, 680) * tune.punchCooldown);
-        fighter.attackUntil = now + (fighter.skin === "blonde" ? 225 : 260);
+          now +
+          (fighter.human ? 380 * tune.punchCooldown : rand(460, 680) * tune.punchCooldown) *
+            (weaponTune?.cooldownMul || 1);
+        fighter.attackUntil =
+          now +
+          (fighter.weapon === "hammer"
+            ? 340
+            : fighter.weapon === "bat"
+              ? 285
+              : fighter.weapon === "blade"
+                ? 245
+                : fighter.skin === "blonde"
+                  ? 225
+                  : 260);
       } else {
         if (now < fighter.kickCooldownUntil) return false;
         const tune = fighterTuning(fighter.skin);
@@ -708,7 +762,16 @@ export default function FuseRushGame() {
 
       if (bestTarget) {
         fighter.facing = bestTarget.x >= fighter.x ? 1 : -1;
-        const impactDelay = type === "punch" ? 82 : 150;
+        const impactDelay =
+          type === "punch"
+            ? fighter.weapon === "hammer"
+              ? 145
+              : fighter.weapon === "bat"
+                ? 105
+                : fighter.weapon === "blade"
+                  ? 78
+                  : 82
+            : 150;
         setTimeout(() => {
           const live = gameRef.current;
           if (!live || runState !== "playing" || !fighter.alive) return;
