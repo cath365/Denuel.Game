@@ -1954,10 +1954,19 @@ export default function FuseRushGame() {
           const atlasReady =
             fighter.visualStyle === "phase1" &&
             !!(
-            atlas?.complete &&
-            atlas.naturalWidth >= ATLAS_CELL_W &&
-            atlas.naturalHeight >= ATLAS_CELL_H
-          );
+              atlas?.complete &&
+              atlas.naturalWidth >= ATLAS_CELL_W &&
+              atlas.naturalHeight >= ATLAS_CELL_H
+            );
+          const fantasySheet = fantasyRosterRef.current;
+          const fantasyReady =
+            fighter.visualStyle === "fantasy" &&
+            fighter.fantasyIndex !== null &&
+            !!(
+              fantasySheet?.complete &&
+              fantasySheet.naturalWidth > 0 &&
+              fantasySheet.naturalHeight > 0
+            );
           const fallbackImg =
             imagesRef.current[`${fighter.skin}-idle`] ||
             imagesRef.current["blonde-idle"];
@@ -1969,7 +1978,7 @@ export default function FuseRushGame() {
           const phase = t * (moving ? 0.024 : 0.007) + fighter.id;
           const bob = moving ? -Math.abs(Math.sin(phase)) * 4 : Math.sin(phase) * 1.3;
 
-          if (dashing && atlasReady && atlas) {
+          if (dashing && ((atlasReady && atlas) || (fantasyReady && fantasySheet))) {
             for (let ghost = 3; ghost >= 1; ghost--) {
               ctx.save();
               ctx.globalAlpha = ghost * 0.07;
@@ -1978,7 +1987,19 @@ export default function FuseRushGame() {
                 feetY + bob
               );
               if (fighter.facing < 0) ctx.scale(-1, 1);
-              drawAtlasFrame(ctx, atlas, spriteFrame, spriteW, spriteH);
+
+              if (fantasyReady && fantasySheet && fighter.fantasyIndex !== null) {
+                drawFantasyFighter(
+                  ctx,
+                  fantasySheet,
+                  fighter.fantasyIndex,
+                  spriteH * 0.96,
+                  spriteH
+                );
+              } else if (atlasReady && atlas) {
+                drawAtlasFrame(ctx, atlas, spriteFrame, spriteW, spriteH);
+              }
+
               ctx.restore();
             }
           }
@@ -2011,6 +2032,22 @@ export default function FuseRushGame() {
 
           if (fighter.facing < 0) ctx.scale(-1, 1);
 
+          if (fighter.visualStyle === "fantasy" && attacking) {
+            const actionTilt =
+              fighter.attackType === "kick"
+                ? -0.12 * strikeCurve
+                : -0.07 * strikeCurve;
+            ctx.rotate(actionTilt);
+
+            if (fighter.attackType === "punch") {
+              ctx.translate(strikeCurve * 7, 0);
+              ctx.scale(1 + strikeCurve * 0.06, 1 - strikeCurve * 0.025);
+            } else if (fighter.attackType === "kick") {
+              ctx.translate(strikeCurve * 5, -strikeCurve * 2);
+              ctx.scale(1 + strikeCurve * 0.035, 1 - strikeCurve * 0.018);
+            }
+          }
+
           if (hurt && !knockedOut) {
             ctx.rotate(Math.sin(t * 0.055) * 0.06);
           }
@@ -2020,7 +2057,15 @@ export default function FuseRushGame() {
             ctx.shadowColor = "rgba(140,124,255,.75)";
           }
 
-          if (atlasReady && atlas) {
+          if (fantasyReady && fantasySheet && fighter.fantasyIndex !== null) {
+            drawFantasyFighter(
+              ctx,
+              fantasySheet,
+              fighter.fantasyIndex,
+              spriteH * 0.96,
+              spriteH
+            );
+          } else if (atlasReady && atlas) {
             drawAtlasFrame(ctx, atlas, spriteFrame, spriteW, spriteH);
           } else if (fallbackImg?.complete && fallbackImg.naturalWidth > 0) {
             ctx.drawImage(
