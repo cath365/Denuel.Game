@@ -790,6 +790,11 @@ export default function FuseRushGame() {
         bot.vx *= 0.25;
       }
 
+      if (bot.blocking) {
+        bot.vx *= 0.72;
+        return;
+      }
+
       const dx = target.x - bot.x;
       const distance = Math.abs(dx);
       const dir: 1 | -1 = dx >= 0 ? 1 : -1;
@@ -985,8 +990,14 @@ export default function FuseRushGame() {
             Math.floor((t + fighter.id * 89) / 110) % 2 === 0 ? "run1" : "run2";
 
           let spriteState = moving ? runFrame : "idle";
-          if (fighter.attackType === "punch" && attacking) spriteState = "push";
-          if (fighter.attackType === "kick" && attacking) spriteState = attackProgressSafe(t, fighter, 390) < 0.45 ? "run1" : "run2";
+          if (fighter.attackType === "punch" && attacking) {
+            const p = attackProgressSafe(t, fighter, 250);
+            spriteState = p < 0.16 ? "idle" : p < 0.76 ? "push" : "idle";
+          }
+          if (fighter.attackType === "kick" && attacking) {
+            const p = attackProgressSafe(t, fighter, 390);
+            spriteState = p < 0.22 ? "run1" : p < 0.78 ? "run2" : "idle";
+          }
           if (guarding) spriteState = "idle";
 
           const img =
@@ -1055,6 +1066,23 @@ export default function FuseRushGame() {
             ctx.fillStyle = fighter.color;
             ctx.beginPath();
             ctx.arc(0, -45, 20, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          if (fighter.attackType === "punch" && attacking) {
+            const armColor = fighter.skin === "blonde" ? "#315b9a" : "#245b73";
+            const extension = 20 + strikeCurve * 38;
+            ctx.strokeStyle = armColor;
+            ctx.lineWidth = 13;
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.moveTo(10, -62);
+            ctx.lineTo(extension, -63);
+            ctx.stroke();
+
+            ctx.fillStyle = "#f3c19b";
+            ctx.beginPath();
+            ctx.arc(extension + 8, -63, 8, 0, Math.PI * 2);
             ctx.fill();
           }
 
@@ -1330,7 +1358,7 @@ export default function FuseRushGame() {
 
             <p className="tagline">
               Choose your fighter, enter the stage, and defeat both opponents with punches,
-              kicks and quick movement.
+              kicks, blocking, combos and a charged special attack.
             </p>
 
             <div className="character-title">CHOOSE YOUR FIGHTER</div>
