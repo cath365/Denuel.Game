@@ -54,6 +54,14 @@ type FloatText = {
   size: number;
 };
 
+type WorldBlock = {
+  id: number;
+  nx: number;
+  ny: number;
+  w: number;
+  h: number;
+};
+
 type Hud = {
   hp: number;
   enemies: { name: string; hp: number; alive: boolean }[];
@@ -288,6 +296,11 @@ export default function FuseRushGame() {
       ending: false,
       particles: [] as Particle[],
       floaters: [] as FloatText[],
+      blocks: [
+        { id: 0, nx: -0.28, ny: -0.08, w: 58, h: 34 },
+        { id: 1, nx: 0.30, ny: 0.12, w: 62, h: 36 },
+        { id: 2, nx: 0.02, ny: -0.33, w: 52, h: 32 },
+      ] as WorldBlock[],
       shake: 0,
       flash: 0,
       lastHudAt: 0,
@@ -605,6 +618,37 @@ export default function FuseRushGame() {
             fighter.vx -= n.x * 190;
             fighter.vy -= n.y * 190;
           }
+
+          for (const block of g.blocks as WorldBlock[]) {
+            const bx = g.center.x + block.nx * g.arenaRadius;
+            const by = g.center.y + block.ny * g.arenaRadius;
+            const left = bx - block.w / 2 - fighter.r;
+            const right = bx + block.w / 2 + fighter.r;
+            const top = by - block.h / 2 - fighter.r;
+            const bottom = by + block.h / 2 + fighter.r;
+
+            if (fighter.x > left && fighter.x < right && fighter.y > top && fighter.y < bottom) {
+              const dl = Math.abs(fighter.x - left);
+              const dr = Math.abs(right - fighter.x);
+              const dtb = Math.abs(fighter.y - top);
+              const db = Math.abs(bottom - fighter.y);
+              const minPen = Math.min(dl, dr, dtb, db);
+
+              if (minPen === dl) {
+                fighter.x = left;
+                fighter.vx = Math.min(0, fighter.vx) * -0.28;
+              } else if (minPen === dr) {
+                fighter.x = right;
+                fighter.vx = Math.max(0, fighter.vx) * -0.28;
+              } else if (minPen === dtb) {
+                fighter.y = top;
+                fighter.vy = Math.min(0, fighter.vy) * -0.28;
+              } else {
+                fighter.y = bottom;
+                fighter.vy = Math.max(0, fighter.vy) * -0.28;
+              }
+            }
+          }
         }
 
         for (let i = 0; i < g.fighters.length; i++) {
@@ -664,31 +708,90 @@ export default function FuseRushGame() {
         ctx.save();
         ctx.translate(rand(-g.shake, g.shake), rand(-g.shake, g.shake));
 
-        const bg = ctx.createRadialGradient(
-          g.center.x,
-          g.center.y,
-          0,
-          g.center.x,
-          g.center.y,
-          g.arenaRadius * 1.25
-        );
-        bg.addColorStop(0, "#171c42");
-        bg.addColorStop(0.74, "#0d1028");
-        bg.addColorStop(1, "#070815");
-        ctx.fillStyle = bg;
+        const water = ctx.createLinearGradient(0, 0, 0, rect.height);
+        water.addColorStop(0, "#0b2d49");
+        water.addColorStop(0.46, "#0d4e68");
+        water.addColorStop(1, "#071c35");
+        ctx.fillStyle = water;
         ctx.fillRect(-30, -30, rect.width + 60, rect.height + 60);
 
-        ctx.strokeStyle = "rgba(140,124,255,.78)";
-        ctx.lineWidth = 6;
-        ctx.shadowBlur = 28;
-        ctx.shadowColor = "#7662ff";
+        ctx.save();
+        ctx.globalAlpha = 0.24;
+        ctx.strokeStyle = "#77d8e8";
+        ctx.lineWidth = 1.5;
+        for (let y = 30; y < rect.height; y += 26) {
+          ctx.beginPath();
+          for (let x = -30; x <= rect.width + 30; x += 18) {
+            const waveY = y + Math.sin(x * 0.035 + t * 0.0022 + y * 0.02) * 3.5;
+            if (x === -30) ctx.moveTo(x, waveY);
+            else ctx.lineTo(x, waveY);
+          }
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        const skylineY = Math.max(82, g.center.y - g.arenaRadius - 46);
+        const buildingData = [
+          { x: rect.width * 0.05, w: 48, h: 74 },
+          { x: rect.width * 0.14, w: 62, h: 105 },
+          { x: rect.width * 0.27, w: 46, h: 86 },
+          { x: rect.width * 0.70, w: 54, h: 95 },
+          { x: rect.width * 0.82, w: 70, h: 118 },
+          { x: rect.width * 0.94, w: 44, h: 78 },
+        ];
+        for (let bi = 0; bi < buildingData.length; bi++) {
+          const b = buildingData[bi];
+          const bx = b.x - b.w / 2;
+          const by = skylineY - b.h;
+          ctx.fillStyle = bi % 2 === 0 ? "#172239" : "#1d2942";
+          ctx.fillRect(bx, by, b.w, b.h);
+          ctx.fillStyle = "rgba(255,218,127,.32)";
+          for (let wy = by + 13; wy < skylineY - 8; wy += 16) {
+            for (let wx = bx + 9; wx < bx + b.w - 7; wx += 15) {
+              if ((Math.floor(wx + wy + bi) % 3) !== 0) ctx.fillRect(wx, wy, 6, 7);
+            }
+          }
+          ctx.fillStyle = "#111a2d";
+          ctx.fillRect(bx + b.w * 0.34, by - 8, b.w * 0.32, 8);
+        }
+
+        ctx.save();
+        ctx.shadowBlur = 22;
+        ctx.shadowColor = "rgba(0,0,0,.35)";
+        const shore = ctx.createRadialGradient(
+          g.center.x - g.arenaRadius * 0.18,
+          g.center.y - g.arenaRadius * 0.2,
+          g.arenaRadius * 0.05,
+          g.center.x,
+          g.center.y,
+          g.arenaRadius
+        );
+        shore.addColorStop(0, "#66a84d");
+        shore.addColorStop(0.58, "#4f8f45");
+        shore.addColorStop(0.88, "#8d7446");
+        shore.addColorStop(1, "#c4a66d");
+        ctx.fillStyle = shore;
         ctx.beginPath();
-        ctx.arc(g.center.x, g.center.y, g.arenaRadius, 0, TAU);
+        ctx.arc(g.center.x, g.center.y, g.arenaRadius + 9, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+
+        ctx.strokeStyle = "rgba(229,208,155,.72)";
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.arc(g.center.x, g.center.y, g.arenaRadius + 4, 0, TAU);
         ctx.stroke();
-        ctx.shadowBlur = 0;
+
+        ctx.save();
+        ctx.globalAlpha = 0.18;
+        ctx.fillStyle = "#d6c18e";
+        ctx.translate(g.center.x, g.center.y);
+        ctx.rotate(-0.18);
+        ctx.fillRect(-g.arenaRadius * 0.76, -18, g.arenaRadius * 1.52, 36);
+        ctx.restore();
 
         ctx.globalAlpha = 0.11;
-        ctx.strokeStyle = "#8c7cff";
+        ctx.strokeStyle = "#d9e8b5";
         ctx.lineWidth = 1;
         for (let r = 70; r < g.arenaRadius; r += 70) {
           ctx.beginPath();
@@ -696,6 +799,31 @@ export default function FuseRushGame() {
           ctx.stroke();
         }
         ctx.globalAlpha = 1;
+
+        for (const block of g.blocks as WorldBlock[]) {
+          const bx = g.center.x + block.nx * g.arenaRadius;
+          const by = g.center.y + block.ny * g.arenaRadius;
+          ctx.save();
+          ctx.shadowBlur = 14;
+          ctx.shadowColor = "rgba(0,0,0,.38)";
+          ctx.fillStyle = "#353d49";
+          ctx.fillRect(bx - block.w / 2, by - block.h / 2, block.w, block.h);
+          ctx.fillStyle = "#596474";
+          ctx.fillRect(bx - block.w / 2 + 4, by - block.h / 2 + 4, block.w - 8, 8);
+          ctx.strokeStyle = "rgba(255,255,255,.16)";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(bx - block.w / 2, by - block.h / 2, block.w, block.h);
+          ctx.restore();
+        }
+
+        ctx.strokeStyle = "rgba(140,124,255,.72)";
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = "#7662ff";
+        ctx.beginPath();
+        ctx.arc(g.center.x, g.center.y, g.arenaRadius - 2, 0, TAU);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
 
         for (const fighter of g.fighters as Fighter[]) {
           if (!fighter.alive) continue;
