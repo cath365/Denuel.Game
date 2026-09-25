@@ -21,6 +21,7 @@ type Fighter = {
   id: number;
   name: string;
   human: boolean;
+  choice: FighterChoice;
   skin: Skin;
   visualStyle: VisualStyle;
   color: string;
@@ -110,40 +111,77 @@ const FIGHTER_ROSTER: Array<{
   visualStyle: VisualStyle;
   subtitle: string;
   badge: string;
+  description: string;
+  accent: string;
+  attack: number;
+  defense: number;
+  speedStat: number;
+  technique: number;
 }> = [
   {
     id: "blaze",
     name: "Blaze",
     skin: "blonde",
     visualStyle: "phase1",
-    subtitle: "Rushdown • full combat animation",
+    subtitle: "Rushdown",
     badge: "NEW",
+    description: "Fiery pressure fighter with fast punches and explosive forward attacks.",
+    accent: "#ff7b2f",
+    attack: 5,
+    defense: 3,
+    speedStat: 5,
+    technique: 4,
   },
   {
     id: "nyx",
     name: "Nyx",
     skin: "dark",
     visualStyle: "phase1",
-    subtitle: "Power Guard • full combat animation",
+    subtitle: "Power Guard",
     badge: "NEW",
+    description: "Tactical defender with strong kicks, better blocking and heavy counter attacks.",
+    accent: "#765cff",
+    attack: 4,
+    defense: 5,
+    speedStat: 3,
+    technique: 5,
   },
   {
     id: "classic-blaze",
     name: "Classic Blaze",
     skin: "blonde",
     visualStyle: "classic",
-    subtitle: "Original game fighter",
+    subtitle: "Classic Rushdown",
     badge: "CLASSIC",
+    description: "The original Blaze appearance with the same fast rushdown fighting behavior.",
+    accent: "#f0a02f",
+    attack: 5,
+    defense: 3,
+    speedStat: 5,
+    technique: 3,
   },
   {
     id: "classic-nyx",
     name: "Classic Nyx",
     skin: "dark",
     visualStyle: "classic",
-    subtitle: "Original game fighter",
+    subtitle: "Classic Power Guard",
     badge: "CLASSIC",
+    description: "The original Nyx appearance with the same defensive kick-focused behavior.",
+    accent: "#4d67ce",
+    attack: 4,
+    defense: 5,
+    speedStat: 3,
+    technique: 4,
   },
 ];
+
+const getOpponentChoice = (choice: FighterChoice): FighterChoice => {
+  if (choice === "blaze") return "nyx";
+  if (choice === "nyx") return "blaze";
+  if (choice === "classic-blaze") return "classic-nyx";
+  return "classic-blaze";
+};
 
 const FRAME_INDEX = {
   idle: 0,
